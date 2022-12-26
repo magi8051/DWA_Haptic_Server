@@ -1,11 +1,13 @@
 /**
  ******************************************************************************
  * @file		: ae_i2c.c
- * @version	: 220712A
- * @creaor		: magi8051
+ * @version		: 221226A
+ * @creaor		: jks
  ******************************************************************************
  * @attention	: Design for Haptic RedNoah3 Board
  * 2022.07.12	: i2c code change for time margin
+ * 2022.12.22	: i2c R/W function cleanup
+ * 2022.12.26	: code optimized
  ******************************************************************************
  * Do Not Change!! *
  */
@@ -71,16 +73,14 @@ static void idelay(volatile uint32_t tmout)
 
 uint32_t init_hs_i2c(uint8_t dat, uint32_t tmout)
 {
-	uint8_t tmp;
-	uint8_t ack;
+	uint8_t tmp, ack;
 
 	// Start
 	SDA(0);
 	idelay(tmout);
-	tmp = 0;
 	ack = 0;
-	SCL(0);
 	tmp = dat;
+	SCL(0);
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -88,21 +88,17 @@ uint32_t init_hs_i2c(uint8_t dat, uint32_t tmout)
 		idelay(tmout);
 		SCL(1);
 		idelay(tmout);
-		SCL(0);
 		tmp <<= 1;
+		SCL(0);
 	}
-
 	// No ACK Event
-	idelay(tmout);
 	SDA(1); // Set High-z
 	idelay(tmout);
 	SCL(1);
 	idelay(tmout);
 	SCL(0);
 	idelay(tmout);
-
 	// no stop function
-	idelay(tmout);
 	SCL(1);
 	idelay(tmout);
 	SDA(1);
@@ -117,9 +113,9 @@ uint32_t new_i2c_write_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tm
 	/*START*/
 	SDA(0);
 	idelay(tmout); // 100ns ?
-	SCL(0);
-	ack = 0;
 	tmp = id;
+	ack = 0;
+	SCL(0);
 
 	/*Start ID*/
 	for (int i = 0; i < 8; i++)
@@ -128,13 +124,13 @@ uint32_t new_i2c_write_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tm
 		idelay(tmout);
 		SCL(1);
 		idelay(tmout);
-		SCL(0);
 		tmp <<= 1;
+		SCL(0);
 	}
 
 	/*ACK*/
 	SDA(1);
-	idelay(tmout + 1); /* margin check */
+	idelay(tmout); /* margin check */
 	SCL(1);
 	idelay(tmout);
 	ack = I2C_NACK;
@@ -149,21 +145,20 @@ uint32_t new_i2c_write_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tm
 			idelay(tmout);
 			SCL(1);
 			idelay(tmout);
-			SCL(0);
 			tmp <<= 1;
+			SCL(0);
 		}
 		/*ACK*/
 		SDA(1);
-		idelay(tmout + 1); /* margin check */
+		idelay(tmout); /* margin check */
 		SCL(1);
-		// ack = I2C_NACK;
 		idelay(tmout);
 		SCL(0);
 	}
 
 	/*STOP*/
 	SDA(0);
-	idelay(tmout + 1); /* margin check */
+	idelay(tmout); /* margin check */
 	SCL(1);
 	idelay(tmout);
 	SDA(1);
@@ -178,9 +173,9 @@ uint32_t new_i2c_read_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmo
 	/*START*/
 	SDA(0);
 	idelay(tmout);
-	SCL(0);
-	ack = 0;
 	tmp = id + 1;
+	ack = 0;
+	SCL(0);
 
 	/*R-ID*/
 	for (int i = 0; i < 8; i++)
@@ -189,34 +184,33 @@ uint32_t new_i2c_read_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmo
 		idelay(tmout);
 		SCL(1);
 		idelay(tmout);
-		SCL(0);
 		tmp <<= 1;
+		SCL(0);
 	}
 	/*ACK*/
 	SDA(1);
-	idelay(tmout + 1); /* margin check */
+	idelay(tmout); /* margin check */
 	SCL(1);
 	idelay(tmout);
-	ack = I2C_NACK;
-	SCL(0);
+	ack = I2C_NACK; /* ack check */
+	SCL(0);			/* start data out */
 	tmp = 0;
 	idelay(tmout);
 
 	/*R-DATA*/
 	while (size--)
-	{ /*read sda pin*/
+	{ /*read SDA pin*/
 		for (int i = 0; i < 8; i++)
 		{
 			SCL(1);
 			idelay(tmout);
 			tmp |= I2C_DAT;
 			SCL(0);
-			//idelay(tmout + 1); /* margin check */
 
 			if (i < 7)
 			{
 				tmp <<= 1;
-				idelay(tmout + 1); /* margin check */
+				idelay(tmout); /* margin check */
 			}
 		}
 		(*dat++) = tmp;
@@ -226,13 +220,12 @@ uint32_t new_i2c_read_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmo
 		{
 			/*Force NoACK*/
 			SDA(0);
-			idelay(tmout); 
+			idelay(tmout);
 			SCL(1);
 			idelay(tmout);
 			SCL(0);
-			//idelay(tmout);
 			SDA(1);
-			idelay(tmout); 
+			idelay(tmout);
 		}
 		else
 		{
@@ -245,7 +238,7 @@ uint32_t new_i2c_read_task(uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmo
 	}
 	/*STOP*/
 	SDA(0);
-	idelay(tmout + 1); /* margin check */
+	idelay(tmout); /* margin check */
 	SCL(1);
 	idelay(tmout);
 	SDA(1);
@@ -263,170 +256,23 @@ uint8_t i2c_pin_state(void)
 
 uint32_t i2c_write_task(uint8_t id, uint16_t addr, uint16_t type, uint8_t *dat, uint16_t size, uint16_t tmout)
 {
-	uint8_t tmp, ack;
+	memmove(dat + type, dat, size);
 
-	/*START*/
-	SDA(0);
-	idelay(tmout); // 100ns ?
-	SCL(0);
-	ack = 0;
-	tmp = id;
-
-	/*Start ID*/
-	for (int i = 0; i < 8; i++)
+	if (type == 1)
 	{
-		SDA((tmp & 0x80) ? 1 : 0);
-		idelay(tmout);
-		SCL(1);
-		idelay(tmout);
-		SCL(0);
-		tmp <<= 1;
+		dat[0] = (uint8_t)(addr >> 0);
+	}
+	else
+	{
+		dat[0] = (uint8_t)(addr >> 8);
+		dat[1] = (uint8_t)(addr >> 0);
 	}
 
-	/*ACK*/
-	SDA(1);
-	idelay(tmout + 1); /* margin check */
-	SCL(1);
-	idelay(tmout);
-	ack = I2C_NACK;
-	SCL(0);
-
-	/* Write Address */
-	while (type)
-	{
-		tmp = addr >> ((1 - type) * 8);
-		for (int i = 0; i < 8; i++)
-		{
-			SDA((tmp & 0x80) ? 1 : 0);
-			idelay(tmout);
-			SCL(1);
-			idelay(tmout);
-			SCL(0);
-			tmp <<= 1;
-		}
-		/*ACK*/
-		SDA(1);
-		idelay(tmout + 1); /* margin check */
-		SCL(1);
-		// ack = I2C_NACK;
-		idelay(tmout);
-		SCL(0);
-		type--;
-	}
-
-	/* Write Data */
-	while (size--)
-	{
-		tmp = (*dat++);
-		for (int i = 0; i < 8; i++)
-		{
-			SDA((tmp & 0x80) ? 1 : 0);
-			idelay(tmout);
-			SCL(1);
-			idelay(tmout);
-			SCL(0);
-			tmp <<= 1;
-		}
-		/*ACK*/
-		SDA(1);
-		idelay(tmout + 1); /* margin check */
-		SCL(1);
-		// ack = I2C_NACK;
-		idelay(tmout);
-		SCL(0);
-	}
-
-	/*STOP*/
-	SDA(0);
-	idelay(tmout + 1); /* margin check */
-	SCL(1);
-	idelay(tmout);
-	SDA(1);
-
-	return ack;
+	return new_i2c_write_task(id, dat, size + type, tmout);
 }
 
 uint32_t i2c_read_task(uint8_t id, uint16_t addr, uint16_t type, uint8_t *dat, uint16_t size, uint16_t tmout)
 {
-	uint8_t tmp, ack;
-
-	/* Write Address */
 	i2c_write_task(id, addr, type, dat, 0, tmout);
-
-	/*START*/
-	SDA(0);
-	idelay(tmout);
-	SCL(0);
-	ack = 0;
-	tmp = id + 1;
-
-	/*R-ID*/
-	for (int i = 0; i < 8; i++)
-	{
-		SDA((tmp & 0x80) ? 1 : 0);
-		idelay(tmout);
-		SCL(1);
-		idelay(tmout);
-		SCL(0);
-		tmp <<= 1;
-	}
-	/*ACK*/
-	SDA(1);
-	idelay(tmout + 1); /* margin check */
-	SCL(1);
-	idelay(tmout);
-	ack = I2C_NACK;
-	SCL(0);
-	tmp = 0;
-	idelay(tmout);
-
-	/*R-DATA*/
-	while (size--)
-	{ /*read sda pin*/
-		for (int i = 0; i < 8; i++)
-		{
-			SCL(1);
-			idelay(tmout);
-			tmp |= I2C_DAT;
-			SCL(0);
-			//idelay(tmout + 1); /* margin check */
-
-			if (i < 7)
-			{
-				tmp <<= 1;
-				idelay(tmout + 1); /* margin check */
-			}
-		}
-		(*dat++) = tmp;
-		tmp = 0;
-
-		if (size)
-		{
-			/*Force NoACK*/
-			SDA(0);
-			idelay(tmout);
-			SCL(1);
-			idelay(tmout);
-			SCL(0);
-			//idelay(tmout);
-			SDA(1);
-			idelay(tmout);
-		}
-		else
-		{
-			/*NoAck*/
-			idelay(tmout);
-			SCL(1);
-			idelay(tmout);
-			SCL(0);
-		}
-	}
-	/*STOP*/
-	SDA(0);
-	idelay(tmout + 1); /* margin check */
-	SCL(1);
-	idelay(tmout);
-	SDA(1);
-
-	return 0;
+	return new_i2c_read_task(id, dat, size, tmout);
 }

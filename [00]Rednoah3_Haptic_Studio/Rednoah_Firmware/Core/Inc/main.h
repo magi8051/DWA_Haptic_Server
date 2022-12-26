@@ -48,7 +48,7 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x22071404
+#define REDNOAH_FW_INFO 0x22122604 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
@@ -141,9 +141,9 @@ extern "C"
         timer1_act : 1,
         timer7_act : 1,
         scope_act : 1,
-				scope_cal : 1,
+        scope_cal : 1,
         rtp_act : 1,
-				rtp_stop : 1;
+        rtp_stop : 1;
   };
 
   /*stream buffer stuct*/
@@ -153,7 +153,7 @@ extern "C"
     u8 dev;
     u8 id;
     u8 pk;
-		u8 mode;
+    u8 mode;
     u16 play;
     u16 psize;
     u16 cnt[2];
