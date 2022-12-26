@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+#Rednoah board firmware define
+RedNoah3_EVB/
+DebugConfig/
+Bin/
+.vscode/
+
