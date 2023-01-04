@@ -1,11 +1,11 @@
 /**
   ******************************************************************************
   * @file		: sensor.c
-  * @version	: 22.06.16
+  * @version	: 23.01.04
   * @creaor		: magi8051
 
   ******************************************************************************
-
+  * i2c update with ae_i2c
  ******************************************************************************
 * Do Not Change!! *
 */
@@ -79,20 +79,8 @@ static void asm_delay(void)
 
 static void idelay(volatile uint32_t tmout)
 {
-	if (tmout < 1)
-	{
-		__asm volatile("NOP");
-		__asm volatile("NOP");
-		__asm volatile("NOP");
-		__asm volatile("NOP");
-		__asm volatile("NOP");
-	}
-	else
-	{
-		for (volatile int i = 0; i < tmout; i++)
-		{
-		}
-	}
+	for (volatile int i = 0; i < tmout; i++)
+		;
 }
 
 uint32_t si2c_write_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmout)
@@ -127,28 +115,25 @@ uint32_t si2c_write_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, ui
 	ack = 0;
 	tmp = id;
 	SCL(0);
-	asm_delay();
 
 	/*Start ID*/
 	for (int i = 0; i < 8; i++)
 	{
 		SDA((tmp & 0x80) ? 1 : 0);
-		tmp <<= 1;
 		idelay(tmout);
 		SCL(1);
 		idelay(tmout);
+		tmp <<= 1;
 		SCL(0);
-		asm_delay();
 	}
 
 	/*ACK*/
 	SDA(1);
 	idelay(tmout);
 	SCL(1);
-	ack = I2C_NACK;
 	idelay(tmout);
+	ack = I2C_NACK;
 	SCL(0);
-	asm_delay();
 
 	while (size--)
 	{
@@ -156,21 +141,18 @@ uint32_t si2c_write_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, ui
 		for (int i = 0; i < 8; i++)
 		{
 			SDA((tmp & 0x80) ? 1 : 0);
-			tmp <<= 1;
 			idelay(tmout);
 			SCL(1);
 			idelay(tmout);
+			tmp <<= 1;
 			SCL(0);
-			asm_delay();
 		}
 		/*ACK*/
 		SDA(1);
 		idelay(tmout);
 		SCL(1);
-		// ack = I2C_NACK;
 		idelay(tmout);
 		SCL(0);
-		asm_delay();
 	}
 
 	/*STOP*/
@@ -185,7 +167,7 @@ uint32_t si2c_write_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, ui
 
 uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uint16_t tmout)
 {
-	uint8_t tmp;
+	uint8_t tmp, ack;
 
 	if (ch == 0)
 	{
@@ -214,7 +196,6 @@ uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uin
 	idelay(tmout);
 	tmp = id + 1;
 	SCL(0);
-	asm_delay();
 
 	/*R-ID*/
 	for (int i = 0; i < 8; i++)
@@ -225,15 +206,15 @@ uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uin
 		idelay(tmout);
 		tmp <<= 1;
 		SCL(0);
-		asm_delay();
 	}
 	/*ACK*/
 	SDA(1);
 	idelay(tmout);
 	SCL(1);
 	idelay(tmout);
-	tmp = 0;
+	ack = I2C_NACK;
 	SCL(0);
+	tmp = 0;
 	idelay(tmout);
 
 	/*R-DATA*/
@@ -241,14 +222,16 @@ uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uin
 	{ /*read sda pin*/
 		for (int i = 0; i < 8; i++)
 		{
-			idelay(tmout);
 			SCL(1);
 			idelay(tmout);
 			tmp |= I2C_DAT;
-			if (i < 7)
-				tmp <<= 1;
 			SCL(0);
-			asm_delay();
+
+			if (i < 7)
+			{
+				tmp <<= 1;
+				idelay(tmout);
+			}
 		}
 		(*dat++) = tmp;
 		tmp = 0;
@@ -260,8 +243,8 @@ uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uin
 			SCL(1);
 			idelay(tmout);
 			SCL(0);
-			asm_delay();
 			SDA(1);
+			idelay(tmout);
 		}
 		else
 		{ /*Noack*/
@@ -269,7 +252,6 @@ uint32_t si2c_read_task(uint8_t ch, uint8_t id, uint8_t *dat, uint16_t size, uin
 			SCL(1);
 			idelay(tmout);
 			SCL(0);
-			asm_delay();
 		}
 	}
 	/*STOP*/

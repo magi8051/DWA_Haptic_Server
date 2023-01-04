@@ -77,13 +77,14 @@ u8 g_ic_info;
 u32 g_flash_jmp;
 
 /*i2c pv*/
-u8 g_i2c_info[4] = {I2C_1MHZ, I2C_2MHZ, I2C_3MHZ, I2C_400KHZ};
+u8 g_i2c_info[] = {I2C_50KHZ, I2C_100KHZ, I2C_400KHZ, I2C_1MHZ, I2C_1_2MHZ, I2C_2MHZ, I2C_3MHZ};
 u8 g_i2c_clk;
 u8 g_i2c_id;
 
 /*timer pv*/
 u16 g_tmr_psc;
 u16 g_tmr_period;
+u32 g_tmr_cnt_1ms;
 
 enum board_type
 {
@@ -104,8 +105,8 @@ enum dev
 {
   DW7800 = 0,
   DW7802,
-	DW7912,
-  DW7914  
+  DW7912,
+  DW7914
 };
 
 /* USER CODE END PV */
@@ -206,7 +207,7 @@ void uart_transfer_task(u32 tx_size)
 static void device_info_request(void)
 {
   volatile u8 pin, size, i;
-	uint32_t sn[3];
+  uint32_t sn[3];
 
   i = 0;
   pin = i2c_pin_state();
@@ -218,18 +219,18 @@ static void device_info_request(void)
   s_upk.buf[9] = (u8)(REDNOAH_FW_INFO >> 16);
   s_upk.buf[10] = (u8)(REDNOAH_FW_INFO >> 8);
   s_upk.buf[11] = (u8)(REDNOAH_FW_INFO >> 0);
-	
-	/*step: serial number*/
-	sn[0] = HAL_GetUIDw0();
-	sn[1] = HAL_GetUIDw1();
-	sn[2] = HAL_GetUIDw2();
-	for (int i = 0; i < 3; i++)
-	{
-		s_upk.buf[12 + i * 4] = (u8)(sn[i] >> 24);
-		s_upk.buf[13 + i * 4] = (u8)(sn[i] >> 16);
-		s_upk.buf[14 + i * 4] = (u8)(sn[i] >> 8);
-		s_upk.buf[15 + i * 4] = (u8)(sn[i] >> 0);
-	}
+
+  /*step: serial number*/
+  sn[0] = HAL_GetUIDw0();
+  sn[1] = HAL_GetUIDw1();
+  sn[2] = HAL_GetUIDw2();
+  for (int i = 0; i < 3; i++)
+  {
+    s_upk.buf[12 + i * 4] = (u8)(sn[i] >> 24);
+    s_upk.buf[13 + i * 4] = (u8)(sn[i] >> 16);
+    s_upk.buf[14 + i * 4] = (u8)(sn[i] >> 8);
+    s_upk.buf[15 + i * 4] = (u8)(sn[i] >> 0);
+  }
 
   /* i2c pin setting error */
   if (pin != 3)
@@ -264,100 +265,99 @@ Function	: trig pin control
 Version		: 1.0
 Descript 	: io 1 ~ 4
 ***************************************************************************/
-static void trig_ctrl_task(void)
+static void trig_ctrl_task(int setup)
 {
-	u8 pin_num, time_num, temp;
-	u16 time[8], time_temp;
-	u16 time_elapsed = 0;
-	uint32_t pin[8], pin_temp;
-	
-	pin_num = s_upk.buf[8];
-	time_num = pin_num * 2;
-	for (int i = 0; i < pin_num; i++)
-	{
-		pin[i] = GPIO_PIN_0 << s_upk.buf[9 + i * 5];
-		pin[i + pin_num] = (uint32_t)GPIO_PIN_0 << (16 + s_upk.buf[9 + i * 5]);
-		time[i] = _8u16(s_upk.buf + (10 + i * 5));
-		time[i + pin_num] = _8u16(s_upk.buf + (12 + i * 5)) + time[i];
-	}
-	
-	/* sort array */
-	for (int i = 0; i < time_num; i++)
-	{
-		for (int j = 0; j < time_num - 1; j++)
-		{
-			if (time[j] > time[j + 1])
-			{
-				pin_temp = pin[j];
-				pin[j] = pin[j + 1];
-				pin[j + 1] = pin_temp;
-				
-				time_temp = time[j];
-				time[j] = time[j + 1];
-				time[j + 1] = time_temp;
-			}
-		}
-	}
-	
-	/* remove duplicats time */
-	for (int i = 0; i < time_num - 1; i++)
-	{
-		temp = time_num;
-		for (int j = i + 1; j < temp; j++)
-		{
-			if (time[i] == time[i + 1])
-			{
-				time_num--;
-				pin[i] |= pin[i + 1];
-				for (int k = i + 1; k < time_num; k++)
-				{
-					pin[k] = pin[k + 1];
-					time[k] = time[k + 1];
-				}
-			}
-			else
-			{
-				break;
-			}
-		}
-	}
-	
-	/* set trigger */
-	for (int i = 0; i < time_num; i++)
-	{
-		if (time[i] != 0)
-		//if (time[i] - time_elapsed > 2)
-		{
-			delay_us(time[i] - time_elapsed);
-			time_elapsed = time[i];
-		}
-//		else if (time[i] - time_elapsed == 1)
-//		{
-//			for (volatile int i = 0; i < 8; i++)
-//			{
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//				__asm volatile("NOP");
-//			}
-//		}
-		//time_elapsed = time[i];
+  u32 pin_temp;
+  u8 temp, pin_num;
+  static u16 delay_cnt, io;
+  static u8 time_num;
+  static u16 time_elapsed;
+  u16 time[8], time_temp;
+  static u32 pin[8];
 
-		GPIOA->BSRR = pin[i];
-//		for (volatile int i = 0; i < 8; i++)
-//    {
-//      __asm volatile("NOP");
-//      __asm volatile("NOP");
-//      __asm volatile("NOP");
-//      __asm volatile("NOP");
-//      __asm volatile("NOP");
-//      __asm volatile("NOP");
-//    }
-	}
-	
+  if (setup == 0)
+  {
+    /*init reg*/
+    io = 0;
+    delay_cnt = 0;
+    time_elapsed = 0;
+
+    pin_num = s_upk.buf[8];
+    time_num = pin_num * 2;
+    for (int i = 0; i < pin_num; i++)
+    {
+      pin[i] = GPIO_PIN_0 << s_upk.buf[9 + i * 5];
+      pin[i + pin_num] = (uint32_t)GPIO_PIN_0 << (16 + s_upk.buf[9 + i * 5]);
+      time[i] = _8u16(s_upk.buf + (10 + i * 5));
+      time[i + pin_num] = _8u16(s_upk.buf + (12 + i * 5)) + time[i];
+    }
+
+    /* sort array */
+    for (int i = 0; i < time_num; i++)
+    {
+      for (int j = 0; j < time_num - 1; j++)
+      {
+        if (time[j] > time[j + 1])
+        {
+          pin_temp = pin[j];
+          pin[j] = pin[j + 1];
+          pin[j + 1] = pin_temp;
+
+          time_temp = time[j];
+          time[j] = time[j + 1];
+          time[j + 1] = time_temp;
+        }
+      }
+    }
+
+    /* remove duplicats time */
+    for (int i = 0; i < time_num - 1; i++)
+    {
+      temp = time_num;
+      for (int j = i + 1; j < temp; j++)
+      {
+        if (time[i] == time[i + 1])
+        {
+          time_num--;
+          pin[i] |= pin[i + 1];
+          for (int k = i + 1; k < time_num; k++)
+          {
+            pin[k] = pin[k + 1];
+            time[k] = time[k + 1];
+          }
+        }
+        else
+        {
+          break;
+        }
+      }
+    }
+    delay_cnt = time[io] - time_elapsed;
+    time_elapsed = time[io];
+  }
+
+  else if (s_bit.trig_act == 1)
+  {
+    if (delay_cnt > 1)
+    {
+      delay_cnt--;
+    }
+    else
+    {
+      GPIOA->BSRR = pin[io];
+
+      if (io > time_num) /* finish */
+      {
+        s_bit.trig_act = 0;
+      }
+      else
+      {
+        io++;
+      }
+      delay_cnt = time[io] - time_elapsed;
+      time_elapsed = time[io];
+    }
+  }
 }
 
 /***************************************************************************
@@ -402,7 +402,8 @@ static void board_set_task(void)
     break;
 
   case 0x05: /* Trigger pin control */
-    trig_ctrl_task();
+    s_bit.trig_act = 1;
+    trig_ctrl_task(0);
     break;
 
   case 0xFA: /*firmware update*/
@@ -499,24 +500,25 @@ static void init_redhoah_system(void)
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* for handshake */
-  //device_info_request();
+  // device_info_request();
 
   /*boot messsage to PC*/
-  sys_timer_set(TIMER_1, PLAY, 10000); /* systick 10ms */
+  sys_timer_set(TIMER_1, PLAY, 1000); /* systick 1ms */
 }
 
 /***************************************************************************
 Function	: tick_led_task
 Version		: 1.0
-Descript 	: led blink tick 10ms
+Descript 	: led blink tick 1ms
 ***************************************************************************/
 static void sys_led_task(void)
 {
   volatile static u32 t1, t2, n;
 
   t1++;
+  g_tmr_cnt_1ms++;
 
-  if (t1 > 20)
+  if (t1 > 200)
   {
     t1 = 0;
     LED4_T;
@@ -524,7 +526,7 @@ static void sys_led_task(void)
 
   if (s_bit.rtp_act)
   {
-    if (t2 > 10)
+    if (t2 > 100)
     {
       n++;
       t2 = 0;
@@ -563,6 +565,7 @@ Descript 	: polling mode 10ms
 static void sys_key_task(void)
 {
   volatile static u32 lock;
+  u8 dat[2];
 
   if (!KEY1 || !KEY2 || !KEY3)
   {
@@ -571,6 +574,7 @@ static void sys_key_task(void)
       lock = 1;
       LED1_T;
       /* user code here!! */
+      new_i2c_write_task(0xb2, dat, 2, I2C_1_2MHZ);
     }
     else if (!KEY2 && !lock)
     {
@@ -608,12 +612,14 @@ static void i2c_task(void)
     s_bit.scope_act = 0;
   }
 
-  clk = g_i2c_clk;
-	id = g_i2c_id;
+  // id = g_i2c_id;
   s_bit.i2c_act = 1;
   type = s_upk.buf[7] & 0x10;
   asize = s_upk.buf[7] & 0x0f;
+  /* clk set */
   g_i2c_clk = g_i2c_info[s_upk.buf[8]];
+  // clk = g_i2c_clk;
+
   dsize = _8u16(s_upk.buf + 9);
   g_i2c_id = s_upk.buf[11];
 
@@ -643,8 +649,8 @@ static void i2c_task(void)
     uart_transfer_task(2);
   }
 
-  g_i2c_clk = clk;
-	g_i2c_id = id;
+  // g_i2c_clk = clk;
+  // g_i2c_id = id;
   s_bit.i2c_act = 0;
   s_bit.scope_act = scope;
   scope = 0;
@@ -713,10 +719,10 @@ int init_rtp_task(void)
       {
         time = 5000;
       }
-			else if (s_rtp.dev == DW7802)
-			{
-				time = 5000;
-			}
+      else if (s_rtp.dev == DW7802)
+      {
+        time = 5000;
+      }
       else if (s_rtp.dev == DW7912)
       {
         /* for test set value */
@@ -726,11 +732,11 @@ int init_rtp_task(void)
       else if (s_rtp.dev == DW7914)
       {
         time = 5000;
-        //i2c_8bit_w(0x0B, 0x00); /* RTP */
+        // i2c_8bit_w(0x0B, 0x00); /* RTP */
       }
 
       s_bit.rtp_act = 1;
-			s_bit.rtp_stop = 0;
+      s_bit.rtp_stop = 0;
       sys_timer_set(TIMER_7, PLAY, time); /* start timer */
     }
   }
@@ -745,7 +751,7 @@ int init_rtp_task(void)
     {
       i2c_8bit_w(0x0C, 0x00);
     }
-		else if (s_rtp.dev == DW7912)
+    else if (s_rtp.dev == DW7912)
     {
       /* play stop & fifo fulsh */
       i2c_8bit_w(0x09, 0x00);
@@ -815,11 +821,11 @@ int play_rtp_task(void)
       }
     }
 
-		/* DW7802 */
+    /* DW7802 */
     else if (s_rtp.dev == DW7802)
     {
       /* step : check fifo */
-      i2c_read_task(g_i2c_id, 0x31, I2C_8BIT, buf, 2, I2C_2MHZ);
+      i2c_read_task(g_i2c_id, 0x31, I2C_8BIT, buf, 2, I2C_1MHZ);
       fifo = _8u16(buf);
 
       /* what if fifo is empty?*/
@@ -832,8 +838,10 @@ int play_rtp_task(void)
           play = s_rtp.size[p] - s_rtp.cnt[p];
         }
 
-        i2c_write_task(g_i2c_id, 0x0D, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_2MHZ);
-        i2c_8bit_w(0x0C, 0x01);
+        i2c_write_task(g_i2c_id, 0x0D, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_1MHZ);
+        // i2c_8bit_w(0x0C, 0x01);
+        buf[0] = 0x01;
+        i2c_write_task(g_i2c_id, 0x0C, I2C_8BIT, buf, 1, I2C_1MHZ);
         s_rtp.cnt[p] += play;
 
         /* hand shake */
@@ -854,7 +862,7 @@ int play_rtp_task(void)
         }
       }
     }
-		
+
     /* DW7912 */
     else if (s_rtp.dev == DW7912)
     {
@@ -871,8 +879,10 @@ int play_rtp_task(void)
           play = s_rtp.size[p] - s_rtp.cnt[p];
         }
 
-        i2c_write_task(g_i2c_id, 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_2MHZ);
-        i2c_8bit_w(0x09, 0x01);
+        i2c_write_task(g_i2c_id, 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_1MHZ);
+        // i2c_8bit_w(0x09, 0x01);
+        buf[0] = 0x01;
+        i2c_write_task(g_i2c_id, 0x09, I2C_8BIT, buf, 1, I2C_1MHZ);
         s_rtp.cnt[p] += play;
 
         /* hand shake */
@@ -894,11 +904,11 @@ int play_rtp_task(void)
       }
     }
 
-		/* DW7914 */
+    /* DW7914 */
     else if (s_rtp.dev == DW7914)
     {
       /* step : check fifo */
-      i2c_read_task(g_i2c_id, 0x4D, I2C_8BIT, buf, 2, I2C_2MHZ);
+      i2c_read_task(g_i2c_id, 0x4D, I2C_8BIT, buf, 2, I2C_1MHZ);
       fifo = _8u16(buf);
 
       /* what if fifo is empty?*/
@@ -911,8 +921,10 @@ int play_rtp_task(void)
           play = s_rtp.size[p] - s_rtp.cnt[p];
         }
 
-        i2c_write_task(g_i2c_id, 0x0D, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_2MHZ);
-        i2c_8bit_w(0x0C, 0x01);
+        i2c_write_task(g_i2c_id, 0x0D, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_1MHZ);
+        // i2c_8bit_w(0x0C, 0x01);
+        buf[0] = 0x01;
+        i2c_write_task(g_i2c_id, 0x0C, I2C_8BIT, buf, 1, I2C_1MHZ);
         s_rtp.cnt[p] += play;
 
         /* hand shake */
@@ -947,10 +959,10 @@ int play_rtp_task(void)
     s_upk.buf[7] = s_rtp.dev;
     s_upk.buf[8] = 0xff;
     uart_transfer_task(3);
-		
-		LED1(LEDON);
-		LED2(LEDON);
-		LED3(LEDON);
+
+    LED1(LEDON);
+    LED2(LEDON);
+    LED3(LEDON);
   }
 
   return 0;
@@ -998,8 +1010,8 @@ Descript 	: Data read out (200us)
 ***************************************************************************/
 void g_sensor_read_out(void)
 {
-  u8 dat[6], fifo;
   u16 p, n;
+  u8 dat[6], fifo;
   static u8 cks, mode;
 
   /* Auto trigger mode */
@@ -1007,35 +1019,35 @@ void g_sensor_read_out(void)
   {
     if (s_rtp.loop[0] > s_rtp.cnt[0])
     {
-      //p = s_rtp.cnt[0] * 18;
-
       /* all sensor read */
       dat[0] = 0x39;
-			si2c_write_task(0, s_rtp.id, dat, 1, I2C_2MHZ);
-			si2c_read_task(0, s_rtp.id, &fifo, 1, I2C_2MHZ);
-			if (fifo + s_rtp.cnt[0] > s_rtp.loop[0])
-			{
-				fifo = s_rtp.loop[0] - s_rtp.cnt[0];
-			}
-			for (int i = 0; i < fifo; i++)
-			{
-				for (int ch = 0; ch < 3; ch++)
-				{
-					dat[0] = 0x32;
-					si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
-					si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
+      si2c_write_task(0, s_rtp.id, dat, 1, I2C_2MHZ);
+      si2c_read_task(0, s_rtp.id, &fifo, 1, I2C_2MHZ);
 
-					p = s_rtp.cnt[0] * 18;
-					n = (ch * 6) + p;
-					s_upk.buf[12 + n] = dat[0];
-					s_upk.buf[13 + n] = dat[1];
-					s_upk.buf[14 + n] = dat[2];
-					s_upk.buf[15 + n] = dat[3];
-					s_upk.buf[16 + n] = dat[4];
-					s_upk.buf[17 + n] = dat[5];
-				}
-				s_rtp.cnt[0]++;
-			}
+      if (fifo + s_rtp.cnt[0] > s_rtp.loop[0])
+      {
+        fifo = s_rtp.loop[0] - s_rtp.cnt[0];
+      }
+
+      for (int i = 0; i < fifo; i++)
+      {
+        for (int ch = 0; ch < 3; ch++)
+        {
+          dat[0] = 0x32;
+          si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
+          si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
+
+          p = s_rtp.cnt[0] * 18;
+          n = (ch * 6) + p;
+          s_upk.buf[12 + n] = dat[0];
+          s_upk.buf[13 + n] = dat[1];
+          s_upk.buf[14 + n] = dat[2];
+          s_upk.buf[15 + n] = dat[3];
+          s_upk.buf[16 + n] = dat[4];
+          s_upk.buf[17 + n] = dat[5];
+        }
+        s_rtp.cnt[0]++;
+      }
     }
     else
     {
@@ -1050,14 +1062,14 @@ void g_sensor_read_out(void)
       s_upk.buf[10] = s_rtp.size[0] >> 8;
       s_upk.buf[11] = s_rtp.size[0] >> 0;
       uart_transfer_task(6 + s_rtp.size[0]);
-			
-			/* flush FIFO and set to BYPASS Mode */
-			for (int ch = 0; ch < 3; ch++)
-			{
-				dat[0] = 0x38; 
-				dat[1] = 0x00;
-				si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-			}
+
+      /* flush FIFO and set to BYPASS Mode */
+      for (int ch = 0; ch < 3; ch++)
+      {
+        dat[0] = 0x38;
+        dat[1] = 0x00;
+        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+      }
     }
   }
 
@@ -1065,45 +1077,52 @@ void g_sensor_read_out(void)
   else if (s_rtp.mode == 0x02)
   {
     if (s_rtp.cnt[0] == 0)
-			{
-				cks = 0;
-			}
-		
-		/* all sensor read */
+    {
+      cks = 0;
+    }
+
+    /* all sensor read */
     dat[0] = 0x39;
-		si2c_write_task(0, s_rtp.id, dat, 1, I2C_2MHZ);
-		si2c_read_task(0, s_rtp.id, &fifo, 1, I2C_2MHZ);
-		if (fifo + s_rtp.cnt[0] > s_rtp.loop[0])
-		{
-			fifo = s_rtp.loop[0] - s_rtp.cnt[0];
-		}
-		for (int i = 0; i < fifo; i++)
-		{
-			for (int ch = 0; ch < 3; ch++)
-			{
-				dat[0] = 0x32;
-				si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
-				si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
+    for (int i = 0; i < 3; i++)
+    {
+      if (si2c_write_task(i, s_rtp.id, dat, 1, I2C_2MHZ) == I2C_ACK)
+      {
+        si2c_read_task(i, s_rtp.id, &fifo, 1, I2C_2MHZ);
+        break;
+      }
+    }
 
-				if (s_rtp.cnt[1] < s_rtp.loop[0])
-				{
-					s_rtp.pk = 0;
-				}
-				else
-				{
-					s_rtp.pk = 1;
-				}
+    if (fifo + s_rtp.cnt[0] > s_rtp.loop[0])
+    {
+      fifo = s_rtp.loop[0] - s_rtp.cnt[0];
+    }
+    for (int i = 0; i < fifo; i++)
+    {
+      for (int ch = 0; ch < 3; ch++)
+      {
+        dat[0] = 0x32;
+        si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
+        si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
 
-				for (int k = 0; k < 6; k++)
-				{
-					n = ch * 6 + (s_rtp.cnt[0] * 18);
-					s_rtp.buf[s_rtp.pk][(12 + k) + n] = dat[k];
-					cks += dat[k];
-				}
-			}
-			s_rtp.cnt[0]++;
-			s_rtp.cnt[1]++;
-		}
+        if (s_rtp.cnt[1] < s_rtp.loop[0])
+        {
+          s_rtp.pk = 0;
+        }
+        else
+        {
+          s_rtp.pk = 1;
+        }
+
+        for (int k = 0; k < 6; k++)
+        {
+          n = ch * 6 + (s_rtp.cnt[0] * 18);
+          s_rtp.buf[s_rtp.pk][(12 + k) + n] = dat[k];
+          cks += dat[k];
+        }
+      }
+      s_rtp.cnt[0]++;
+      s_rtp.cnt[1]++;
+    }
 
     if (s_rtp.cnt[1] == s_rtp.loop[0])
     {
@@ -1139,109 +1158,112 @@ Descript 	: Data set up
 ***************************************************************************/
 void g_sensor_set_task(void)
 {
-  u8 dat[2], rsize;
   u16 time;
+  u8 dat[2], rdat, rsize;
 
   rsize = 18;
   time = 1000;
-
   s_rtp.id = 0x3A;
 
   if (s_upk.buf[7] == 0x00)
   {
-    /* sensor setting */
+    /* sensor setting & detect */
     if (s_upk.buf[8] == 0x00)
     {
       /* auto contect detect */
       for (int ch = 0; ch < 3; ch++)
       {
         dat[0] = 0x00;
-        si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
-        si2c_read_task(ch, s_rtp.id, dat + 1, 1, I2C_2MHZ);
-        s_upk.buf[9 + ch] = dat[1];
+        si2c_write_task(ch, s_rtp.id, dat, 1, I2C_400KHZ);
+        si2c_read_task(ch, s_rtp.id, &rdat, 1, I2C_400KHZ);
+        s_upk.buf[9 + ch] = rdat;
 
-        /* Default Sensor setup */
-        dat[0] = 0x2E; /* sensor setup */
-        dat[1] = 0x00;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+        if (rdat == 0xE5)
+        {
+          /* Default Sensor setup */
+          dat[0] = 0x2E; /* sensor setup */
+          dat[1] = 0x00;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x1D; /* Tab threshold */
-        dat[1] = 20;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x1D; /* Tab threshold */
+          dat[1] = 20;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x21; /* DUR register */
-        dat[1] = 50;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x21; /* DUR register */
+          dat[1] = 50;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x22;
-        dat[1] = 0;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x22;
+          dat[1] = 0;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x23;
-        dat[1] = 0;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x23;
+          dat[1] = 0;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x2A; /* Tab Axes */
-        dat[1] = 0x07;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-				
-				dat[0] = 0x2C; /* Data Rate 3200Hz */
-        dat[1] = 0x0F;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x2A; /* Tab Axes */
+          dat[1] = 0x07;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
 
-        dat[0] = 0x2D; /* Power Control */
-        dat[1] = 0x08;
-        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          dat[0] = 0x2C; /* Data Rate 3200Hz */
+          dat[1] = 0x0F;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
+
+          dat[0] = 0x2D; /* Power Control */
+          dat[1] = 0x08;
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
+        }
       }
-
       /* for handshake */
       uart_transfer_task(6);
     }
+    /* g scale setting */
     else if (s_upk.buf[8] == 0x01)
     {
-      /* g scale setting */
       for (int ch = 0; ch < 3; ch++)
       {
         if (s_upk.buf[9 + (ch * 2)] & 0x01)
         {
-          dat[0] = 0x31; /* sensor data format */
-          dat[1] = 0x08 | s_upk.buf[10 + (ch * 2)]; /* set to full resolution */
-          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+          /* sensor data format */
+          dat[0] = 0x31;
+          /* set to full resolution */
+          dat[1] = 0x08 | s_upk.buf[10 + (ch * 2)];
+          si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
         }
-				
-				/* for handshake */
-				uart_transfer_task(4);
+
+        /* for handshake */
+        uart_transfer_task(4);
       }
     }
-		else if (s_upk.buf[8] == 0x02)
-		{
-			/* Sensor Offset Calibration */
-			sys_timer_set(TIMER_7, PLAY, 300);
-			s_bit.scope_cal = 1;
-		}
+    /* Sensor Offset Calibration */
+    else if (s_upk.buf[8] == 0x02)
+    {
+      sys_timer_set(TIMER_7, PLAY, 300);
+      s_bit.scope_cal = 1;
+    }
   }
 
-  /* auto trigger */
+  /* auto trigger setting*/
   else if (s_upk.buf[7] == 0x01)
   {
     s_rtp.mode = s_upk.buf[7];
-		//s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 1000 / time;
-		s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 3200 / 1000;
-    s_rtp.size[0] = s_rtp.loop[0] * rsize;
+    // s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 1000 / time;
+    s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 3200 / 1000;
+    s_rtp.size[0] = s_rtp.loop[0] * rsize; /* 3 Sensor x 6byte */
     s_rtp.cnt[0] = 0;
 
     /* Set to FIFO Mode */
-		for (int ch = 0; ch < 3; ch++)
-		{
-			dat[0] = 0x38; 
-			dat[1] = 0x40;
-			si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-		}
-		
-		/* timer set & measure started*/
+    for (int ch = 0; ch < 3; ch++)
+    {
+      dat[0] = 0x38;
+      dat[1] = 0x40;
+      si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
+    }
+
+    /* timer set & measure started*/
     sys_timer_set(TIMER_7, s_upk.buf[8], time);
-		
-		    if (s_upk.buf[8] == PLAY)
+
+    if (s_upk.buf[8] == PLAY)
     {
       s_bit.scope_act = 1;
     }
@@ -1258,9 +1280,9 @@ void g_sensor_set_task(void)
     else if (s_upk.buf[9] == DW7802)
     {
       /*  */
-			i2c_8bit_w(0x0C, 0x01); /* play on */
+      i2c_8bit_w(0x0C, 0x01); /* play on */
     }
-		else if (s_upk.buf[9] == DW7912)
+    else if (s_upk.buf[9] == DW7912)
     {
       /*  */
       i2c_8bit_w(0x09, 0x01); /* play on */
@@ -1269,15 +1291,15 @@ void g_sensor_set_task(void)
     {
       /*  */
       i2c_8bit_w(0x0C, 0x01); /* play on */
-    }    
+    }
   }
 
-  /* continuous */
+  /* continuous setting*/
   else if (s_upk.buf[7] == 0x02)
   {
     s_rtp.mode = s_upk.buf[7];
-		//s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 1000 / time;
-		s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 3200 / 1000;
+    // s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 1000 / time;
+    s_rtp.loop[0] = _8u16(s_upk.buf + 11) * 3200 / 1000;
     s_rtp.loop[1] = s_rtp.loop[0] << 1;
     s_rtp.psize = s_rtp.loop[0] * rsize + 6;
     s_rtp.cnt[0] = 0;
@@ -1287,7 +1309,7 @@ void g_sensor_set_task(void)
     for (int i = 0; i < 10; i++)
     {
       s_rtp.buf[0][i] = s_upk.buf[i];
-			s_rtp.buf[1][i] = s_upk.buf[i];
+      s_rtp.buf[1][i] = s_upk.buf[i];
     }
     /* packet size redefine */
     s_rtp.buf[0][2] = s_rtp.psize >> 8;
@@ -1301,14 +1323,14 @@ void g_sensor_set_task(void)
     s_rtp.buf[1][11] = (s_rtp.psize - 6) >> 0;
 
     /* Set to FIFO Mode */
-		for (int ch = 0; ch < 3; ch++)
-		{
-			dat[0] = 0x38; 
-			dat[1] = 0x40;
-			si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-		}
-		
-		/* timer set & measure started*/
+    for (int ch = 0; ch < 3; ch++)
+    {
+      dat[0] = 0x38;
+      dat[1] = 0x40;
+      si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
+    }
+
+    /* timer set & measure started*/
     sys_timer_set(TIMER_7, s_upk.buf[8], time);
 
     if (s_upk.buf[8] == PLAY)
@@ -1318,15 +1340,15 @@ void g_sensor_set_task(void)
     else
     {
       /* flush FIFO and set to BYPASS Mode */
-			for (int ch = 0; ch < 3; ch++)
-			{
-				dat[0] = 0x38; 
-				dat[1] = 0x00;
-				si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-			}
-			
-			uart_transfer_task(3);
-			s_bit.scope_act = 0;
+      for (int ch = 0; ch < 3; ch++)
+      {
+        dat[0] = 0x38;
+        dat[1] = 0x00;
+        si2c_write_task(ch, s_rtp.id, dat, 2, I2C_400KHZ);
+      }
+
+      uart_transfer_task(3);
+      s_bit.scope_act = 0;
     }
   }
 }
@@ -1340,103 +1362,102 @@ void g_sensor_ofs_cal(void)
 {
   static s32 sum[9];
   static u16 cnt;
-	u16 avg = 320;
-	u8 dat[6], buf[6], fifo;
-	s8 ofs[3];
-	
-	
-	/* initialize offset registers */
-	if (cnt == 0) 
-	{
-		dat[0] = 0x1E;
-		dat[1] = 0x00;
-		dat[2] = 0x00;
-		dat[3] = 0x00;
-		for (int ch = 0; ch < 3; ch++)
-		{
-			si2c_write_task(ch, s_rtp.id, dat, 4, I2C_2MHZ);			
-		}
-		
-		/* Set to FIFO Mode */
-		for (int ch = 0; ch < 3; ch++)
-		{
-			dat[0] = 0x38; 
-			dat[1] = 0x40;
-			si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-		}
-	}
-	
-	/* read all sensors */
-	dat[0] = 0x39;
-	si2c_write_task(0, s_rtp.id, dat, 1, I2C_2MHZ);
-	si2c_read_task(0, s_rtp.id, &fifo, 1, I2C_2MHZ);
-	if (fifo + cnt > avg)
-	{
-		fifo = avg - cnt;
-	}
-	for (int i = 0; i < fifo; i++)
-	{
-		for (int ch = 0; ch < 3; ch++) 
-		{
-			dat[0] = 0x32;
-			si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
-			si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
-			
-			/* swap bytes */
-			buf[0] = dat[1];
-			buf[1] = dat[0];
-			buf[2] = dat[3];
-			buf[3] = dat[2];
-			buf[4] = dat[5];
-			buf[5] = dat[4];
+  u16 avg = 320;
+  u8 dat[6], buf[6], fifo;
+  s8 ofs[3];
 
-			/* summation of 0.1sec read data */
-			sum[0 + (ch * 3)] += _twos(_8u16(&buf[0]));
-			sum[1 + (ch * 3)] += _twos(_8u16(&buf[2]));
-			sum[2 + (ch * 3)] += _twos(_8u16(&buf[4]));
-		}
-		cnt++;
-	}
-	
-	/* write offset */
-	if (cnt == avg) 
-	{
-		for (int ch = 0; ch < 3; ch++)
-		{
-			ofs[0] = -sum[0 + (ch * 3)] / avg / 4;		/* average and convert g values */
-			ofs[1] = -sum[1 + (ch * 3)] / avg / 4;		/* read data :  3.9mg/LSB in full resolution mode */
-			ofs[2] = -sum[2 + (ch * 3)] / avg / 4;		/* ofs reg   : 15.6mg/LSB */
-			
-			dat[0] = 0x1E;
-			dat[1] = ofs[0];
-			dat[2] = ofs[1];
-			dat[3] = ofs[2];
-			
-			si2c_write_task(ch, s_rtp.id, dat, 4, I2C_2MHZ);
-		}
-		/* kill timer */
-		sys_timer_set(TIMER_7, STOP, 0);
-		s_bit.scope_cal = 0;
-		
-		/* for hand shake */
-		s_upk.buf[9] = 0xFF;
-		uart_transfer_task(4);
-		
-		/* flush FIFO and set to BYPASS Mode */
-		for (int ch = 0; ch < 3; ch++)
-		{
-			dat[0] = 0x38; 
-			dat[1] = 0x00;
-			si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
-		}
-		
-		/* initialize variables */
-		cnt = 0;
-		for (int i = 0; i < 9; i++)
-		{
-			sum[i] = 0;
-		}
-	}
+  /* initialize offset registers */
+  if (cnt == 0)
+  {
+    dat[0] = 0x1E;
+    dat[1] = 0x00;
+    dat[2] = 0x00;
+    dat[3] = 0x00;
+    for (int ch = 0; ch < 3; ch++)
+    {
+      si2c_write_task(ch, s_rtp.id, dat, 4, I2C_2MHZ);
+    }
+
+    /* Set to FIFO Mode */
+    for (int ch = 0; ch < 3; ch++)
+    {
+      dat[0] = 0x38;
+      dat[1] = 0x40;
+      si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+    }
+  }
+
+  /* read all sensors */
+  dat[0] = 0x39;
+  si2c_write_task(0, s_rtp.id, dat, 1, I2C_2MHZ);
+  si2c_read_task(0, s_rtp.id, &fifo, 1, I2C_2MHZ);
+  if (fifo + cnt > avg)
+  {
+    fifo = avg - cnt;
+  }
+  for (int i = 0; i < fifo; i++)
+  {
+    for (int ch = 0; ch < 3; ch++)
+    {
+      dat[0] = 0x32;
+      si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
+      si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
+
+      /* swap bytes */
+      buf[0] = dat[1];
+      buf[1] = dat[0];
+      buf[2] = dat[3];
+      buf[3] = dat[2];
+      buf[4] = dat[5];
+      buf[5] = dat[4];
+
+      /* summation of 0.1sec read data */
+      sum[0 + (ch * 3)] += _twos(_8u16(&buf[0]));
+      sum[1 + (ch * 3)] += _twos(_8u16(&buf[2]));
+      sum[2 + (ch * 3)] += _twos(_8u16(&buf[4]));
+    }
+    cnt++;
+  }
+
+  /* write offset */
+  if (cnt == avg)
+  {
+    for (int ch = 0; ch < 3; ch++)
+    {
+      ofs[0] = -sum[0 + (ch * 3)] / avg / 4; /* average and convert g values */
+      ofs[1] = -sum[1 + (ch * 3)] / avg / 4; /* read data :  3.9mg/LSB in full resolution mode */
+      ofs[2] = -sum[2 + (ch * 3)] / avg / 4; /* ofs reg   : 15.6mg/LSB */
+
+      dat[0] = 0x1E;
+      dat[1] = ofs[0];
+      dat[2] = ofs[1];
+      dat[3] = ofs[2];
+
+      si2c_write_task(ch, s_rtp.id, dat, 4, I2C_2MHZ);
+    }
+    /* kill timer */
+    sys_timer_set(TIMER_7, STOP, 0);
+    s_bit.scope_cal = 0;
+
+    /* for hand shake */
+    s_upk.buf[9] = 0xFF;
+    uart_transfer_task(4);
+
+    /* flush FIFO and set to BYPASS Mode */
+    for (int ch = 0; ch < 3; ch++)
+    {
+      dat[0] = 0x38;
+      dat[1] = 0x00;
+      si2c_write_task(ch, s_rtp.id, dat, 2, I2C_2MHZ);
+    }
+
+    /* initialize variables */
+    cnt = 0;
+    for (int i = 0; i < 9; i++)
+    {
+      sum[i] = 0;
+    }
+  }
 }
 
 /* USER CODE END 0 */
@@ -1495,6 +1516,7 @@ int main(void)
     {
       sys_led_task();
       sys_key_task();
+      trig_ctrl_task(RUN);
       s_bit.timer1_act = 0;
     }
 
@@ -1508,10 +1530,10 @@ int main(void)
       {
         g_sensor_read_out();
       }
-			else if (s_bit.scope_cal)
-			{
-				g_sensor_ofs_cal();
-			}
+      else if (s_bit.scope_cal)
+      {
+        g_sensor_ofs_cal();
+      }
       s_bit.timer7_act = 0;
     }
 

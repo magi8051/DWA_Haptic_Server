@@ -48,7 +48,7 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x22122604 /* INFO -> (0x/year/month/date/rev 0 to 255) */
+#define REDNOAH_FW_INFO 0x23010400 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
@@ -67,8 +67,11 @@ extern "C"
 #define PI_ 3.14159265
 
 /*I2C Define*/
-#define I2C_400KHZ 20
+#define I2C_50KHZ 136
+#define I2C_100KHZ 68
+#define I2C_400KHZ 16
 #define I2C_1MHZ 5
+#define I2C_1_2MHZ 4
 #define I2C_2MHZ 2
 #define I2C_3MHZ 1
 #define I2C_8BIT 1
@@ -143,7 +146,8 @@ extern "C"
         scope_act : 1,
         scope_cal : 1,
         rtp_act : 1,
-        rtp_stop : 1;
+        rtp_stop : 1,
+        trig_act : 1;
   };
 
   /*stream buffer stuct*/
