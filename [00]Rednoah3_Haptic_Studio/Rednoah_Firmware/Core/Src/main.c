@@ -201,13 +201,13 @@ void uart_transfer_task(u32 tx_size)
 
   LED5_T;
   HAL_UART_Transmit_DMA(&huart1, (u8 *)s_upk.buf, tx_size + BHD6);
-  // HAL_UART_Transmit_IT(&huart1,(u8*)s_upk.buf, txsize + BHD6);
+  // HAL_UART_Transmit_IT(&huart1,(u8*)s_upk.buf, tx_size + BHD6);
 }
 
 static void device_info_request(void)
 {
   volatile u8 pin, size, i;
-  uint32_t sn[3];
+  u32 pid[3];
 
   i = 0;
   pin = i2c_pin_state();
@@ -221,15 +221,16 @@ static void device_info_request(void)
   s_upk.buf[11] = (u8)(REDNOAH_FW_INFO >> 0);
 
   /*step: serial number*/
-  sn[0] = HAL_GetUIDw0();
-  sn[1] = HAL_GetUIDw1();
-  sn[2] = HAL_GetUIDw2();
+  pid[0] = HAL_GetUIDw0();
+  pid[1] = HAL_GetUIDw1();
+  pid[2] = HAL_GetUIDw2();
+
   for (int i = 0; i < 3; i++)
   {
-    s_upk.buf[12 + i * 4] = (u8)(sn[i] >> 24);
-    s_upk.buf[13 + i * 4] = (u8)(sn[i] >> 16);
-    s_upk.buf[14 + i * 4] = (u8)(sn[i] >> 8);
-    s_upk.buf[15 + i * 4] = (u8)(sn[i] >> 0);
+    s_upk.buf[12 + i * 4] = (u8)(pid[i] >> 24);
+    s_upk.buf[13 + i * 4] = (u8)(pid[i] >> 16);
+    s_upk.buf[14 + i * 4] = (u8)(pid[i] >> 8);
+    s_upk.buf[15 + i * 4] = (u8)(pid[i] >> 0);
   }
 
   /* i2c pin setting error */
