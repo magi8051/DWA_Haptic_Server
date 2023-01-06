@@ -266,22 +266,23 @@ Function	: trig pin control
 Version		: 1.0
 Descript 	: io 1 ~ 4
 ***************************************************************************/
+
 static void trig_ctrl_task(int setup)
 {
   u32 pin_temp;
   u8 temp, pin_num;
-  static u16 delay_cnt, io;
-  static u8 time_num;
-  static u16 time_elapsed;
-  u16 time[8], time_temp;
-  static u32 pin[8];
+  static u8 tn, time_num;
+  static u32 pin[8], pin_cnt;
+  static u16 delay_cnt, time_elapsed, time[8], time_temp;
 
-  if (setup == 0)
+  if (!setup)
   {
     /*init reg*/
-    io = 0;
+    tn = 0;
     delay_cnt = 0;
     time_elapsed = 0;
+    memset(time, 0, sizeof(time));
+    memset(pin, 0, sizeof(pin));
 
     pin_num = s_upk.buf[8];
     time_num = pin_num * 2;
@@ -333,30 +334,32 @@ static void trig_ctrl_task(int setup)
         }
       }
     }
-    delay_cnt = time[io] - time_elapsed;
-    time_elapsed = time[io];
+
+    delay_cnt = time[tn] - time_elapsed;
+    time_elapsed = time[tn];
+    s_bit.trig_act = 1;
   }
-
-  else if (s_bit.trig_act == 1)
+  else
   {
-    if (delay_cnt > 1)
+    if (s_bit.trig_act)
     {
-      delay_cnt--;
-    }
-    else
-    {
-      GPIOA->BSRR = pin[io];
-
-      if (io > time_num) /* finish */
+      if (delay_cnt > 1)
       {
-        s_bit.trig_act = 0;
+        delay_cnt--;
       }
       else
       {
-        io++;
+        GPIOA->BSRR = pin[tn];
+        tn++;
+        delay_cnt = time[tn] - time_elapsed;
+        time_elapsed = time[tn];
+
+        if (tn >= time_num) /* finish */
+        {
+          s_bit.trig_act = 0;
+        }
       }
-      delay_cnt = time[io] - time_elapsed;
-      time_elapsed = time[io];
+      // HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_3);
     }
   }
 }
@@ -403,7 +406,6 @@ static void board_set_task(void)
     break;
 
   case 0x05: /* Trigger pin control */
-    s_bit.trig_act = 1;
     trig_ctrl_task(0);
     break;
 
@@ -471,12 +473,22 @@ static void init_redhoah_system(void)
   /*LDO power on*/
   ADJ_LDO_EN(1); /* ADJ LDO Enable */
 
+  /* SYS LED display*/
+  for (int i = 0; i < 4; i++)
+  {
+    LED1(i % 2);
+    HAL_Delay(100);
+    LED2(i % 2);
+    HAL_Delay(100);
+    LED3(i % 2);
+    HAL_Delay(100);
+  }
+
   /*Auto board check*/
-  HAL_Delay(100);
   s_upk.hw = (BOOT_ID2 << 2) | (BOOT_ID1 << 1) | (BOOT_ID0 << 0);
 
   /*gpio i2c init start*/
-  g_i2c_clk = g_i2c_info[1]; /* set 1mhz */
+  g_i2c_clk = g_i2c_info[3]; /* default 1mhz */
   init_i2c(0, 1);            /* rednoah default, i2c ch 1 */
 
   /* Accel sensor i2c init */
@@ -565,33 +577,47 @@ Descript 	: polling mode 10ms
 ***************************************************************************/
 static void sys_key_task(void)
 {
+  volatile static u8 t1, t2, t3;
   volatile static u32 lock;
-  u8 dat[2];
 
   if (!KEY1 || !KEY2 || !KEY3)
   {
     if (!KEY1 && !lock)
     {
+      t1 = 20;
       lock = 1;
-      LED1_T;
       /* user code here!! */
-      new_i2c_write_task(0xb2, dat, 2, I2C_1_2MHZ);
     }
     else if (!KEY2 && !lock)
     {
+      t2 = 20;
       lock = 1;
-      LED2_T;
       /* user code here!! */
     }
     else if (!KEY3 && !lock)
     {
+      t3 = 20;
       lock = 1;
-      LED3_T;
       /* user code here!! */
     }
   }
   else
   {
+    if (t1)
+    {
+      t1--;
+      (t1 == 0) ? LED1(LEDOF) : LED1(LEDON);
+    }
+    else if (t2)
+    {
+      t2--;
+      (t2 == 0) ? LED2(LEDOF) : LED2(LEDON);
+    }
+    else if (t3)
+    {
+      t3--;
+      (t3 == 0) ? LED3(LEDOF) : LED3(LEDON);
+    }
     lock = 0;
   }
 }
@@ -978,8 +1004,6 @@ static void main_func_state_machine(void)
 {
   if (s_bit.rx_done == 1)
   {
-    LED5(LEDON);
-
     switch (s_upk.buf[6])
     {
     case SYS_FSM:
@@ -1000,7 +1024,7 @@ static void main_func_state_machine(void)
     }
     s_bit.rx_done = 0;
 
-    LED5(LEDOF);
+    LED5_T;
   }
 }
 
@@ -1014,6 +1038,8 @@ void g_sensor_read_out(void)
   u16 p, n;
   u8 dat[6], fifo;
   static u8 cks, mode;
+
+  // HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_3);
 
   /* Auto trigger mode */
   if (s_rtp.mode == 0x01)
@@ -1135,6 +1161,7 @@ void g_sensor_read_out(void)
       }
       s_rtp.buf[0][4] = cks;
       HAL_UART_Transmit_DMA(&huart1, s_rtp.buf[0], s_rtp.psize + BHD6);
+      LED5_T;
     }
 
     else if (s_rtp.cnt[1] == s_rtp.loop[1])
@@ -1148,6 +1175,7 @@ void g_sensor_read_out(void)
       }
       s_rtp.buf[1][4] = cks;
       HAL_UART_Transmit_DMA(&huart1, s_rtp.buf[1], s_rtp.psize + BHD6);
+      LED5_T;
     }
   }
 }
@@ -1515,9 +1543,9 @@ int main(void)
     /* USER CODE BEGIN 3 */
     if (s_bit.timer1_act)
     {
+      trig_ctrl_task(RUN);
       sys_led_task();
       sys_key_task();
-      trig_ctrl_task(RUN);
       s_bit.timer1_act = 0;
     }
 
