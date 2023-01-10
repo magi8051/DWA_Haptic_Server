@@ -1108,7 +1108,7 @@ void g_sensor_read_out(void)
       cks = 0;
     }
 
-    /* all sensor read */
+    /* sensor read for fifo size*/
     dat[0] = 0x39;
     for (int i = 0; i < 3; i++)
     {
@@ -1123,10 +1123,13 @@ void g_sensor_read_out(void)
     {
       fifo = s_rtp.loop[0] - s_rtp.cnt[0];
     }
+
+    /* 18byte x fifo */
     for (int i = 0; i < fifo; i++)
     {
       for (int ch = 0; ch < 3; ch++)
       {
+        /* sensor readout */
         dat[0] = 0x32;
         si2c_write_task(ch, s_rtp.id, dat, 1, I2C_2MHZ);
         si2c_read_task(ch, s_rtp.id, dat, 6, I2C_2MHZ);
@@ -1139,16 +1142,17 @@ void g_sensor_read_out(void)
         {
           s_rtp.pk = 1;
         }
-
+        /* sensor data copy to uart buffer  */
         for (int k = 0; k < 6; k++)
         {
-          n = ch * 6 + (s_rtp.cnt[0] * 18);
+          n = (ch * 6) + (s_rtp.cnt[0] * 18);
           s_rtp.buf[s_rtp.pk][(12 + k) + n] = dat[k];
           cks += dat[k];
         }
       }
       s_rtp.cnt[0]++;
       s_rtp.cnt[1]++;
+      // max size = fifo x (3ch x 6)
     }
 
     if (s_rtp.cnt[1] == s_rtp.loop[0])
@@ -1188,7 +1192,7 @@ Descript 	: Data set up
 void g_sensor_set_task(void)
 {
   u16 time;
-  u8 dat[2], rdat, rsize;
+  u8 dat[2], get, rsize;
 
   rsize = 18;
   time = 1000;
@@ -1204,10 +1208,10 @@ void g_sensor_set_task(void)
       {
         dat[0] = 0x00;
         si2c_write_task(ch, s_rtp.id, dat, 1, I2C_400KHZ);
-        si2c_read_task(ch, s_rtp.id, &rdat, 1, I2C_400KHZ);
-        s_upk.buf[9 + ch] = rdat;
+        si2c_read_task(ch, s_rtp.id, &get, 1, I2C_400KHZ);
+        s_upk.buf[9 + ch] = get;
 
-        if (rdat == 0xE5)
+        if (get == 0xE5)
         {
           /* Default Sensor setup */
           dat[0] = 0x2E; /* sensor setup */
