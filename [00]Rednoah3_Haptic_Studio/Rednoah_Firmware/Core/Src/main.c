@@ -473,17 +473,6 @@ static void init_redhoah_system(void)
   /*LDO power on*/
   ADJ_LDO_EN(1); /* ADJ LDO Enable */
 
-  /* SYS LED display*/
-  for (int i = 0; i < 4; i++)
-  {
-    LED1(i % 2);
-    HAL_Delay(100);
-    LED2(i % 2);
-    HAL_Delay(100);
-    LED3(i % 2);
-    HAL_Delay(100);
-  }
-
   /*Auto board check*/
   s_upk.hw = (BOOT_ID2 << 2) | (BOOT_ID1 << 1) | (BOOT_ID0 << 0);
 
@@ -514,6 +503,17 @@ static void init_redhoah_system(void)
 
   /* for handshake */
   // device_info_request();
+
+  /* SYS LED display*/
+  for (int i = 0; i < 4; i++)
+  {
+    LED1(i % 2);
+    HAL_Delay(100);
+    LED2(i % 2);
+    HAL_Delay(100);
+    LED3(i % 2);
+    HAL_Delay(100);
+  }
 
   /*boot messsage to PC*/
   sys_timer_set(TIMER_1, PLAY, 1000); /* systick 1ms */
@@ -1203,13 +1203,19 @@ void g_sensor_set_task(void)
     /* sensor setting & detect */
     if (s_upk.buf[8] == 0x00)
     {
+      /* wrtie dummy data for i2c line activate */
+      dat[0] = 0x00;
+      si2c_write_task(0, s_rtp.id, dat, 1, I2C_400KHZ);
+      si2c_write_task(1, s_rtp.id, dat, 1, I2C_400KHZ);
+      si2c_write_task(2, s_rtp.id, dat, 1, I2C_400KHZ);
+
       /* auto contect detect */
       for (int ch = 0; ch < 3; ch++)
       {
         dat[0] = 0x00;
         si2c_write_task(ch, s_rtp.id, dat, 1, I2C_400KHZ);
         si2c_read_task(ch, s_rtp.id, &get, 1, I2C_400KHZ);
-        s_upk.buf[9 + ch] = get;
+        (get == 0xE5) ? (s_upk.buf[9 + ch] = get) : (s_upk.buf[9 + ch] = 0xFF);
 
         if (get == 0xE5)
         {
