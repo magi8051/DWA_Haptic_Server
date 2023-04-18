@@ -48,11 +48,12 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x23011002 /* INFO -> (0x/year/month/date/rev 0 to 255) */
+#define REDNOAH_FW_INFO 0x23041800 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
 #define RX_SIZE (1024 * 40 + 32) // 40Kb
+#define RTP_SIZE (1024 * 40 + 32) // 40Kb
 
 /*UART Define*/
 #define BHD6 6
@@ -153,7 +154,7 @@ extern "C"
   /*stream buffer stuct*/
   struct rtp_packet
   {
-    u8 buf[2][RX_SIZE];
+    u8 buf[2][RTP_SIZE];
     u8 dev;
     u8 id;
     u8 pk;
