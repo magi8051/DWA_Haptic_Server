@@ -8,10 +8,12 @@
 #define ADDR_FLASH_SECTOR_2 ((uint32_t)0x08008000) /* Base @ of Sector 2, 16 Kbytes */
 #define ADDR_FLASH_SECTOR_3 ((uint32_t)0x0800C000) /* Base @ of Sector 3, 16 Kbytes */
 #define ADDR_FLASH_SECTOR_4 ((uint32_t)0x08010000) /* Base @ of Sector 4, 64 Kbytes */
+/* 128KB */
 #define ADDR_FLASH_SECTOR_5 ((uint32_t)0x08020000) /* Base @ of Sector 5, 128 Kbytes */
+/* 256KB */
 #define ADDR_FLASH_SECTOR_6 ((uint32_t)0x08040000) /* Base @ of Sector 6, 128 Kbytes */
 #define ADDR_FLASH_SECTOR_7 ((uint32_t)0x08060000) /* Base @ of Sector 7, 128 Kbytes */
-#define ADDR_FLASH_SECTOR_8 ((uint32_t)0x08080000) /* Base @ of Sector 8, 128 Kbytes */
+/* 512KB */
 
 /* User define code */
 #define FLASH_USER_START_ADDR ADDR_FLASH_SECTOR_7 /* Start @ of user Flash area */
@@ -9175,7 +9177,13 @@ void init_flash_setup()
   EraseInitStruct.Sector = g_FirstSector;
   EraseInitStruct.NbSectors = g_NbOfSectors;
 
-  HAL_FLASHEx_Erase(&EraseInitStruct, &g_SectorError);
+  if (HAL_FLASHEx_Erase(&EraseInitStruct, &g_SectorError) != HAL_OK)
+  {
+    while (1)
+    {
+      // error LED display
+    }
+  }
 
   /* Note: If an erase operation in Flash memory also concerns data in the data or instruction cache,
      you have to make sure that these data are rewritten before they are accessed during code
@@ -9209,6 +9217,6 @@ void bootloader_update_task(void)
     }
   }
 
+  HAL_FLASH_Lock();
   HAL_Delay(10);
-  // REDNOAH_RESET;
 }

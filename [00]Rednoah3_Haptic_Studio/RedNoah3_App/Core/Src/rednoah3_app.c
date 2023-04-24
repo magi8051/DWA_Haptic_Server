@@ -569,7 +569,7 @@ Descript 	: i2c r/w event
 static void i2c_task(void)
 {
     static u8 scope;
-    u8 type, dsize, asize;
+    u16 type, dsize, asize;
 
     if (s_bit.scope_act)
     {
