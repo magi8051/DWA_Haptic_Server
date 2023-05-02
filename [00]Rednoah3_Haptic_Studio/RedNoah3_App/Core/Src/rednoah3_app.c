@@ -518,6 +518,7 @@ static void sys_key_task(void)
 {
     volatile static u8 t1, t2, t3;
     volatile static u32 lock;
+	u8 buf;
 
     if (!KEY1 || !KEY2 || !KEY3)
     {
@@ -526,18 +527,21 @@ static void sys_key_task(void)
             t1 = 20;
             lock = 1;
             /* user code here!! */
+            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 252);
         }
         else if (!KEY2 && !lock)
         {
             t2 = 20;
             lock = 1;
             /* user code here!! */
+            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 1);
         }
         else if (!KEY3 && !lock)
         {
             t3 = 20;
             lock = 1;
             /* user code here!! */
+            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 0);
         }
     }
     else
