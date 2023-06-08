@@ -291,6 +291,73 @@ static void trig_ctrl_task(int setup)
 }
 
 /***************************************************************************
+Function	: gpio_ctrl_task
+Version		: 1.0
+Descript 	: chip info, reset, who am i
+***************************************************************************/
+static void gpio_ctrl_task(int rw)
+{
+    GPIO_TypeDef *PORT;
+    uint16_t pin[] = {GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3, GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_3, GPIO_PIN_4,
+                      GPIO_PIN_6, GPIO_PIN_7, GPIO_PIN_10, GPIO_PIN_5};
+
+    if (rw == 0)
+    {
+        if (s_upk.buf[9] <= 5)
+        {
+            PORT = GPIOA;
+            s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
+        }
+        else if (s_upk.buf[9] == 6)
+        {
+            s_upk.buf[10] = HAL_GPIO_ReadPin(GPIOB, pin[s_upk.buf[9]]);
+        }
+        else if (s_upk.buf[9] == 7)
+        {
+            s_upk.buf[10] = HAL_GPIO_ReadPin(GPIOC, pin[s_upk.buf[9]]);
+        }
+        else if (s_upk.buf[9] <= 9)
+        {
+            PORT = GPIOA;
+            s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
+        }
+        else if (s_upk.buf[9] <= 11)
+        {
+            PORT = GPIOC;
+            s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
+        }
+    }
+    else
+    {
+        if (s_upk.buf[9] <= 5)
+        {
+            PORT = GPIOA;
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], 1);
+        }
+        else if (s_upk.buf[9] == 6)
+        {
+            HAL_GPIO_WritePin(GPIOB, pin[s_upk.buf[9]], s_upk.buf[10]);
+        }
+        else if (s_upk.buf[9] == 7)
+        {
+            HAL_GPIO_WritePin(GPIOC, pin[s_upk.buf[9]], s_upk.buf[10]);
+        }
+        else if (s_upk.buf[9] <= 9)
+        {
+            PORT = GPIOA;
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], s_upk.buf[10]);
+        }
+        else if (s_upk.buf[9] <= 11)
+        {
+            PORT = GPIOC;
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], s_upk.buf[10]);
+        }
+    }
+
+    uart_transfer_task(5);
+}
+
+/***************************************************************************
 Function	: board_set_task
 Version		: 1.0
 Descript 	: chip info, reset, who am i
@@ -333,6 +400,10 @@ static void board_set_task(void)
 
     case 0x05: /* Trigger pin control */
         trig_ctrl_task(0);
+        break;
+
+    case 0x06: /* GPIO Control */
+        gpio_ctrl_task(s_upk.buf[8]);
         break;
 
     case 0xFA: /*firmware update*/
@@ -439,6 +510,10 @@ void init_redhoah3_system(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* DW791x Module Board Init */
+    IO0(1); /* DW7912 Enable */
+    IO1(0); /* DW7914 Disable */
+
     /* for handshake */
     // device_info_request();
 
@@ -518,7 +593,6 @@ static void sys_key_task(void)
 {
     volatile static u8 t1, t2, t3;
     volatile static u32 lock;
-	u8 buf;
 
     if (!KEY1 || !KEY2 || !KEY3)
     {
@@ -527,21 +601,18 @@ static void sys_key_task(void)
             t1 = 20;
             lock = 1;
             /* user code here!! */
-            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 252);
         }
         else if (!KEY2 && !lock)
         {
             t2 = 20;
             lock = 1;
             /* user code here!! */
-            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 1);
         }
         else if (!KEY3 && !lock)
         {
             t3 = 20;
             lock = 1;
             /* user code here!! */
-            i2c_write_task(0x18, 0xb2, I2C_8BIT, &buf, 1, 0);
         }
     }
     else
