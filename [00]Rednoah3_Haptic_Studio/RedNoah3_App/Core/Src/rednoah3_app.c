@@ -15,6 +15,7 @@
 #include "rednoah3_i2c.h"
 #include "rednoah3_sensor.h"
 #include "rednoah3_boot.h"
+#include "hpatic_wave.h"
 
 /*Base Struct for BBB*/
 volatile struct bit_reg s_bit; // bit reigster
@@ -24,6 +25,9 @@ struct rtp_packet s_rtp;       // rtp buffer
 /*board info*/
 u8 g_board_info;
 u8 g_ic_info;
+
+/* probe */
+u8 g_dev[2];
 
 /*boot pv*/
 u32 g_flash_jmp;
@@ -41,7 +45,8 @@ u32 g_tmr_cnt_1ms;
 enum board_type
 {
     REDNOAH2 = 0,
-    REDNOAH3
+    REDNOAH3,
+    REDNOAH4
 };
 
 enum fsm
@@ -332,25 +337,25 @@ static void gpio_ctrl_task(int rw)
         if (s_upk.buf[9] <= 5)
         {
             PORT = GPIOA;
-            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], 1);
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
         else if (s_upk.buf[9] == 6)
         {
-            HAL_GPIO_WritePin(GPIOB, pin[s_upk.buf[9]], s_upk.buf[10]);
+            HAL_GPIO_WritePin(GPIOB, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
         else if (s_upk.buf[9] == 7)
         {
-            HAL_GPIO_WritePin(GPIOC, pin[s_upk.buf[9]], s_upk.buf[10]);
+            HAL_GPIO_WritePin(GPIOC, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
         else if (s_upk.buf[9] <= 9)
         {
             PORT = GPIOA;
-            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], s_upk.buf[10]);
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
         else if (s_upk.buf[9] <= 11)
         {
             PORT = GPIOC;
-            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], s_upk.buf[10]);
+            HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
     }
 
@@ -517,6 +522,52 @@ void init_redhoah3_system(void)
     /* for handshake */
     // device_info_request();
 
+    /* probe ic */
+    g_i2c_id = 0xB2;
+    u8 tx[2];
+    if (i2c_8bit_r(0x00) == 0x32)
+    {
+        /* DW7912 set*/
+        g_dev[0] = DW7912;
+        i2c_8bit_w(0x03, 0x01); // mem mode
+        i2c_8bit_w(0x04, 0x05); // user vd-clamp
+        i2c_8bit_w(0x08, 0x53); // vd-clamp 3.3v
+        i2c_8bit_w(0x0C, 0x01); // mem call number 1
+        i2c_8bit_w(0x14, 0x04); // loop x 5
+
+        /* write header*/
+        tx[0] = 0x00;
+        tx[1] = 0x01;
+        i2c_write_task(g_i2c_id, 0x1B, I2C_8BIT, tx, 2, I2C_1MHZ);
+        i2c_write_task(g_i2c_id, 0x1D, I2C_8BIT, (u8 *)g_haptic_hd, sizeof(g_haptic_hd), I2C_1MHZ);
+        /* write body */
+        tx[0] = 0x02;
+        tx[1] = 0x7C;
+        i2c_write_task(g_i2c_id, 0x1B, I2C_8BIT, tx, 2, I2C_1MHZ);
+        i2c_write_task(g_i2c_id, 0x1D, I2C_8BIT, (u8 *)g_haptic_body, sizeof(g_haptic_body), I2C_1MHZ);
+    }
+    else if (i2c_8bit_r(0x00) == 0x40)
+    {
+        /* DW7914 */
+        g_dev[0] = DW7914;
+        i2c_8bit_w(0x0B, 0x01); // mem mode
+        i2c_8bit_w(0x04, 0x05); // vd-clamp mode
+        i2c_8bit_w(0x0A, 0x53); // vd 3.3V
+        i2c_8bit_w(0x0F, 0x01); // mem num 1
+        i2c_8bit_w(0x17, 0x04); // loop x 5
+
+        /* write header*/
+        tx[0] = 0x00;
+        tx[1] = 0x01;
+        i2c_write_task(g_i2c_id, 0x46, I2C_8BIT, tx, 2, I2C_1MHZ);
+        i2c_write_task(g_i2c_id, 0x48, I2C_8BIT, (u8 *)g_haptic_hd, sizeof(g_haptic_hd), I2C_1MHZ);
+        /* write body */
+        tx[0] = 0x02;
+        tx[1] = 0x7C;
+        i2c_write_task(g_i2c_id, 0x46, I2C_8BIT, tx, 2, I2C_1MHZ);
+        i2c_write_task(g_i2c_id, 0x48, I2C_8BIT, (u8 *)g_haptic_body, sizeof(g_haptic_body), I2C_1MHZ);
+    }
+
     /* SYS LED display*/
     for (int i = 0; i < 4; i++)
     {
@@ -601,6 +652,14 @@ static void sys_key_task(void)
             t1 = 20;
             lock = 1;
             /* user code here!! */
+            if (g_dev[0] == DW7912)
+            {
+                i2c_8bit_w(0x09, 0x01);
+            }
+            else if (g_dev[0] == DW7914)
+            {
+                i2c_8bit_w(0x0C, 0x01);
+            }
         }
         else if (!KEY2 && !lock)
         {

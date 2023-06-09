@@ -46,7 +46,7 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x23060800 /* INFO -> (0x/year/month/date/rev 0 to 255) */
+#define REDNOAH_FW_INFO 0x23060900 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
