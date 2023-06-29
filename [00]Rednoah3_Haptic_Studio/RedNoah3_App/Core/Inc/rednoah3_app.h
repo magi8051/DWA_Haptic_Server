@@ -46,7 +46,7 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x23060900 /* INFO -> (0x/year/month/date/rev 0 to 255) */
+#define REDNOAH_FW_INFO 0x23062900 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
@@ -113,6 +113,16 @@ extern "C"
 #define IO1(in) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, (GPIO_PinState)in)
 #define IO2(in) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, (GPIO_PinState)in)
 #define IO3(in) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, (GPIO_PinState)in)
+#define IO4(in) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, (GPIO_PinState)in)
+#define IO5(in) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, (GPIO_PinState)in)
+
+#define IO6(in) HAL_GPIO_WritePin(GPIOF, GPIO_PIN_7, (GPIO_PinState)in)
+#define IO7(in) HAL_GPIO_WritePin(GPIOF, GPIO_PIN_9, (GPIO_PinState)in)
+#define IO8(in) HAL_GPIO_WritePin(GPIOF, GPIO_PIN_8, (GPIO_PinState)in)
+#define IO9(in) HAL_GPIO_WritePin(GPIOF, GPIO_PIN_6, (GPIO_PinState)in)
+
+#define IO10(in) HAL_GPIO_WritePin(GPIOD, GPIO_PIN_8, (GPIO_PinState)in)
+#define IO11(in) HAL_GPIO_WritePin(GPIOD, GPIO_PIN_9, (GPIO_PinState)in)
 
   /*bit register stuct*/
   struct bit_reg

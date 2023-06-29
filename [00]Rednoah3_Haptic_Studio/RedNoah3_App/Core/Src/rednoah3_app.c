@@ -303,8 +303,9 @@ Descript 	: chip info, reset, who am i
 static void gpio_ctrl_task(int rw)
 {
     GPIO_TypeDef *PORT;
-    uint16_t pin[] = {GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3, GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_3, GPIO_PIN_4,
-                      GPIO_PIN_6, GPIO_PIN_7, GPIO_PIN_10, GPIO_PIN_5};
+    uint16_t pin[] = {GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3,
+                      GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_9,
+                      GPIO_PIN_8, GPIO_PIN_6, GPIO_PIN_8, GPIO_PIN_9};
 
     if (rw == 0)
     {
@@ -313,22 +314,14 @@ static void gpio_ctrl_task(int rw)
             PORT = GPIOA;
             s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
         }
-        else if (s_upk.buf[9] == 6)
-        {
-            s_upk.buf[10] = HAL_GPIO_ReadPin(GPIOB, pin[s_upk.buf[9]]);
-        }
-        else if (s_upk.buf[9] == 7)
-        {
-            s_upk.buf[10] = HAL_GPIO_ReadPin(GPIOC, pin[s_upk.buf[9]]);
-        }
         else if (s_upk.buf[9] <= 9)
         {
-            PORT = GPIOA;
+            PORT = GPIOF;
             s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
         }
         else if (s_upk.buf[9] <= 11)
         {
-            PORT = GPIOC;
+            PORT = GPIOD;
             s_upk.buf[10] = HAL_GPIO_ReadPin(PORT, pin[s_upk.buf[9]]);
         }
     }
@@ -339,26 +332,17 @@ static void gpio_ctrl_task(int rw)
             PORT = GPIOA;
             HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
-        else if (s_upk.buf[9] == 6)
-        {
-            HAL_GPIO_WritePin(GPIOB, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
-        }
-        else if (s_upk.buf[9] == 7)
-        {
-            HAL_GPIO_WritePin(GPIOC, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
-        }
         else if (s_upk.buf[9] <= 9)
         {
-            PORT = GPIOA;
+            PORT = GPIOF;
             HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
         else if (s_upk.buf[9] <= 11)
         {
-            PORT = GPIOC;
+            PORT = GPIOD;
             HAL_GPIO_WritePin(PORT, pin[s_upk.buf[9]], (GPIO_PinState)s_upk.buf[10]);
         }
     }
-
     uart_transfer_task(5);
 }
 
@@ -497,32 +481,23 @@ void init_redhoah3_system(void)
     /* Accel sensor i2c init */
     si2c_init();
 
-    /*uart get start*/
-    HAL_UART_Receive_IT(&huart1, &s_upk.get, 1);
-    // HAL_UART_Receive_DMA(&huart1, &s_upk.get, 1);
-
     /*AXL Sensor*/
     SPI3_NSS0(1);
     SPI3_NSS1(1);
     SPI3_NSS2(1);
 
-    /* GPIO for Trigger */
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    /*Configure GPIO pin : PA0,PA1,PA2,PA3 */
-    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    /*uart get start*/
+    HAL_UART_Receive_IT(&huart1, &s_upk.get, 1);
+    // HAL_UART_Receive_DMA(&huart1, &s_upk.get, 1);
 
     /* DW791x Module Board Init */
-    IO0(1); /* DW7912 Enable */
-    IO1(0); /* DW7914 Disable */
+    IO10(1); /* DW7912 / DW7802 Enable */
+    IO11(0); /* DW7914 / DW7917 Disable */
 
     /* for handshake */
     // device_info_request();
 
-    /* probe ic */
+    /* probe haptic ic */
     g_i2c_id = 0xB2;
     u8 tx[2];
     if (i2c_8bit_r(0x00) == 0x32)
