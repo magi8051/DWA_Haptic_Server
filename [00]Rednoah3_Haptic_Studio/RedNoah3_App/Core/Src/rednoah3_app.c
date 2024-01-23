@@ -22,7 +22,7 @@
 volatile struct bit_reg s_bit; // bit reigster
 struct uart_packet s_upk;      // uart buffer
 struct rtp_packet s_rtp;       // rtp buffer
-uint8_t LDO_Value=0x1F;
+uint8_t LDO_Value = 0x1F;
 
 /*board info*/
 u8 g_board_info;
@@ -65,7 +65,7 @@ enum fsm
     RTP_FSM,
     REV_FSM,
     SCP_FSM,
-		COMM_FSM		//Åë½Å ¸ðµå ¼³Á¤
+    COMM_FSM // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 };
 
 enum dev
@@ -120,57 +120,54 @@ static void delay_us(int t)
 }
 #endif
 
-
+#if 0
 static void MX_SPI5_Init_odw(void)
 {
 
-  /* USER CODE BEGIN SPI5_Init 0 */
+    /* USER CODE BEGIN SPI5_Init 0 */
 
-  /* USER CODE END SPI5_Init 0 */
+    /* USER CODE END SPI5_Init 0 */
 
-  /* USER CODE BEGIN SPI5_Init 1 */
+    /* USER CODE BEGIN SPI5_Init 1 */
 
-  /* USER CODE END SPI5_Init 1 */
-  /* SPI5 parameter configuration*/
-  hspi5.Instance = SPI5;
-  hspi5.Init.Mode = SPI_MODE_MASTER;
-  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi5.Init.NSS = SPI_NSS_SOFT;
-  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi5.Init.CRCPolynomial = 10;
-	
-	
-  if (HAL_SPI_Init(&hspi5) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI5_Init 2 */
-	hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
-	hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi5.Init.CLKPhase = SPI_PHASE_2EDGE;
-	
-	 if (HAL_SPI_Init(&hspi5) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    /* USER CODE END SPI5_Init 1 */
+    /* SPI5 parameter configuration*/
+    hspi5.Instance = SPI5;
+    hspi5.Init.Mode = SPI_MODE_MASTER;
+    hspi5.Init.Direction = SPI_DIRECTION_2LINES;
+    hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
+    hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
+    hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
+    hspi5.Init.NSS = SPI_NSS_SOFT;
+    hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+    hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
+    hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
+    hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    hspi5.Init.CRCPolynomial = 10;
 
-  /* USER CODE END SPI5_Init 2 */
+    if (HAL_SPI_Init(&hspi5) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN SPI5_Init 2 */
+    hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+    hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
+    hspi5.Init.CLKPhase = SPI_PHASE_2EDGE;
+
+    if (HAL_SPI_Init(&hspi5) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    /* USER CODE END SPI5_Init 2 */
 }
-
-
-
+#endif
 
 static void idelay_spi(volatile uint32_t tmout)
 {
 
-	for (volatile int i = 0; i < tmout; i++)
-		;
+    for (volatile int i = 0; i < tmout; i++)
+        ;
 }
 
 /***************************************************************************
@@ -200,18 +197,18 @@ void uart_transfer_task(u32 tx_size)
 
 static void delay_us(int t)
 {
-  for (volatile int k = 0; k < 10; k++)
-  {
-    for (volatile int i = 0; i < t; i++)
+    for (volatile int k = 0; k < 10; k++)
     {
-      __asm volatile("NOP");
-      __asm volatile("NOP");
-      __asm volatile("NOP");
-      __asm volatile("NOP");
-      __asm volatile("NOP");
-      __asm volatile("NOP");
+        for (volatile int i = 0; i < t; i++)
+        {
+            __asm volatile("NOP");
+            __asm volatile("NOP");
+            __asm volatile("NOP");
+            __asm volatile("NOP");
+            __asm volatile("NOP");
+            __asm volatile("NOP");
+        }
     }
-  }
 }
 
 static void device_info_request(void)
@@ -276,72 +273,64 @@ Function	: trig pin control
 Version		: 1.0
 Descript 	: io 1 ~ 4
 ***************************************************************************/
-static void LDO_controlup(int count)		//odw MCP4011
+static void LDO_controlup(int count) // odw MCP4011
 {
-	
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_SET);	// UD PIN HIGH
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_SET);	// CS PIN HIGH
-			delay_us(10);	//DELAY
-			
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_RESET);	// CS PIN LOW
-			delay_us(3);	//DELAY
-			
-			for(int i=0; i<count ; i++)	
-			{
-				HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_RESET);	// UD PIN LOW
-				delay_us(2);	//DELAY
-				HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_SET);	// UD PIN HIGH
-				delay_us(2);	//DELAY
-			}
-			delay_us(10);	//DELAY
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_SET);	// CS PIN HIGH
-			
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET); // UD PIN HIGH
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET); // CS PIN HIGH
+    delay_us(10);                                       // DELAY
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET); // CS PIN LOW
+    delay_us(3);                                          // DELAY
+
+    for (int i = 0; i < count; i++)
+    {
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET); // UD PIN LOW
+        delay_us(2);                                          // DELAY
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);   // UD PIN HIGH
+        delay_us(2);                                          // DELAY
+    }
+    delay_us(10);                                       // DELAY
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET); // CS PIN HIGH
 }
 
-static void LDO_controldown(int count)		//odw MCP4011
+static void LDO_controldown(int count) // odw MCP4011
 {
-	
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_SET);	// CS PIN HI
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_RESET);	// UD PIN LOW
-			delay_us(10);	//DELAY
 
-			
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_RESET);	// CS PIN LOW
-			delay_us(3);	//DELAY
-			for(int i=0; i<count ; i++)	
-			{
-				HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_SET);	// UD PIN HIGH
-				delay_us(2);	//DELAY
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET);   // CS PIN HI
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET); // UD PIN LOW
+    delay_us(10);                                         // DELAY
 
-				HAL_GPIO_WritePin(GPIOE,GPIO_PIN_3,GPIO_PIN_RESET);	// UD PIN LOW
-				delay_us(2);	//DELAY
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET); // CS PIN LOW
+    delay_us(3);                                          // DELAY
+    for (int i = 0; i < count; i++)
+    {
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET); // UD PIN HIGH
+        delay_us(2);                                        // DELAY
 
-			}
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET); // UD PIN LOW
+        delay_us(2);                                          // DELAY
+    }
 
-			delay_us(10);	//DELAY
-			HAL_GPIO_WritePin(GPIOE,GPIO_PIN_4,GPIO_PIN_SET);	// CS PIN HIGH
-			
+    delay_us(10);                                       // DELAY
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET); // CS PIN HIGH
 }
 
-
-
-static void LDO_control()		//odw MCP4011
+static void LDO_control() // odw MCP4011
 {
-	
-	if (s_upk.buf[8]==0x00)	//write
-	{
-		LDO_Value=s_upk.buf[9];	
-		LDO_controldown(64);
-		LDO_controlup((int)(s_upk.buf[9]));
 
-	}
-	
-	else //read
-	{
-		s_upk.buf[9]=	LDO_Value;
-	}
-	uart_transfer_task(4);
+    if (s_upk.buf[8] == 0x00) // write
+    {
+        LDO_Value = s_upk.buf[9];
+        LDO_controldown(64);
+        LDO_controlup((int)(s_upk.buf[9]));
+    }
 
+    else // read
+    {
+        s_upk.buf[9] = LDO_Value;
+    }
+    uart_transfer_task(4);
 }
 
 static void trig_ctrl_task(int setup)
@@ -540,10 +529,10 @@ static void board_set_task(void)
     case 0x06: /* GPIO Control */
         gpio_ctrl_task(s_upk.buf[8]);
         break;
-		
-		case 0x07: /* LDO control */
-				LDO_control();
-				break;
+
+    case 0x07: /* LDO control */
+        LDO_control();
+        break;
 
     case 0xFA: /*firmware update*/
         if (s_upk.buf[8] == 0x01)
@@ -707,12 +696,10 @@ void init_redhoah3_system(void)
 
     /*boot messsage to PC*/
     sys_timer_set(TIMER_10, PLAY, 1000); /* systick 1ms */
-		
-		
-		/*LDO Reset*/
-	LDO_controldown(65);
-	LDO_controlup(31);
-		
+
+    /*LDO Reset*/
+    LDO_controldown(65);
+    LDO_controlup(31);
 }
 
 /***************************************************************************
@@ -828,24 +815,22 @@ static void sys_key_task(void)
 
 static void comm_set_task(void)
 {
-	if(s_upk.buf[7]==0)	//read
-	{
-		s_upk.buf[7] = comm_value;
-    uart_transfer_task(2);
-	}
-	else	//write
-	{
-		if(s_upk.buf[8]==0)	
-				comm_value=0;			//i2c mode
-		else
-			comm_value=1;			//SPI mode
-		
-		s_upk.buf[7] = comm_value;
-    uart_transfer_task(2);
-	}
+    if (s_upk.buf[7] == 0) // read
+    {
+        s_upk.buf[7] = comm_value;
+        uart_transfer_task(2);
+    }
+    else // write
+    {
+        if (s_upk.buf[8] == 0)
+            comm_value = 0; // i2c mode
+        else
+            comm_value = 1; // SPI mode
+
+        s_upk.buf[7] = comm_value;
+        uart_transfer_task(2);
+    }
 }
-
-
 
 /***************************************************************************
 Function	: i2c task
@@ -854,99 +839,96 @@ Descript 	: i2c r/w event
 ***************************************************************************/
 static void i2c_task(void)
 {
-	u16 size;
-  static u8 scope;
-  u16 type, dsize, asize;
-	
-	if(comm_value==0){	//i2c mode
+    u16 size;
+    static u8 scope;
+    u16 type, dsize, asize;
 
+    if (comm_value == 0)
+    { // i2c mode
 
-   if (s_bit.scope_act)
-  {
-    scope = 1;
-    s_bit.scope_act = 0;
-  }
+        if (s_bit.scope_act)
+        {
+            scope = 1;
+            s_bit.scope_act = 0;
+        }
 
-  // id = g_i2c_id;
-  s_bit.i2c_act = 1;
-  type = s_upk.buf[7] & 0x10;
-  asize = s_upk.buf[7] & 0x0f;
-  /* clk set */
-  g_i2c_clk = g_i2c_info[s_upk.buf[8]];
-  // clk = g_i2c_clk;
+        // id = g_i2c_id;
+        s_bit.i2c_act = 1;
+        type = s_upk.buf[7] & 0x10;
+        asize = s_upk.buf[7] & 0x0f;
+        /* clk set */
+        g_i2c_clk = g_i2c_info[s_upk.buf[8]];
+        // clk = g_i2c_clk;
 
-  dsize = _8u16(s_upk.buf + 9);
-  g_i2c_id = s_upk.buf[11];
+        dsize = _8u16(s_upk.buf + 9);
+        g_i2c_id = s_upk.buf[11];
 
-  if (type == 0x10) /* i2c read mode */
-  {
-    if (new_i2c_write_task(g_i2c_id, (u8 *)s_upk.buf + 12, asize, g_i2c_clk) != I2C_ACK)
-    {
-      s_upk.buf[7] = 0xff;
-      uart_transfer_task(2);
+        if (type == 0x10) /* i2c read mode */
+        {
+            if (new_i2c_write_task(g_i2c_id, (u8 *)s_upk.buf + 12, asize, g_i2c_clk) != I2C_ACK)
+            {
+                s_upk.buf[7] = 0xff;
+                uart_transfer_task(2);
+            }
+            else
+            {
+                new_i2c_read_task(g_i2c_id, (u8 *)s_upk.buf + (12 + asize), dsize, g_i2c_clk);
+                uart_transfer_task(BHD6 + asize + dsize);
+            }
+        }
+        else /* i2c write mode */
+        {
+            if (new_i2c_write_task(g_i2c_id, (u8 *)s_upk.buf + 12, dsize + asize, g_i2c_clk) != I2C_ACK)
+            {
+                s_upk.buf[7] = 0xff;
+            }
+            else
+            {
+                s_upk.buf[7] = 0x00;
+            }
+            uart_transfer_task(2);
+        }
+
+        // g_i2c_clk = clk;
+        // g_i2c_id = id;
+        s_bit.i2c_act = 0;
+        s_bit.scope_act = scope;
+        scope = 0;
     }
     else
     {
-      new_i2c_read_task(g_i2c_id, (u8 *)s_upk.buf + (12 + asize), dsize, g_i2c_clk);
-      uart_transfer_task(BHD6 + asize + dsize);
-    }
-  }
-  else /* i2c write mode */
-  {
-    if (new_i2c_write_task(g_i2c_id, (u8 *)s_upk.buf + 12, dsize + asize, g_i2c_clk) != I2C_ACK)
-    {
-      s_upk.buf[7] = 0xff;
-    }
-    else
-    {
-      s_upk.buf[7] = 0x00;
-    }
-    uart_transfer_task(2);
-  }
+        // SPI mode
 
-  // g_i2c_clk = clk;
-  // g_i2c_id = id;
-  s_bit.i2c_act = 0;
-  s_bit.scope_act = scope;
-  scope = 0;
-	
-	}
-else{
-				//SPI mode
-	
-		type = s_upk.buf[7] & 0x10;
-		u16 size;
-		size = (*(s_upk.buf + 9) << 8) + *(s_upk.buf + 10)+1;
-		u16 response_size;
-	
-	
-		IO9(0);
-		idelay_spi(20);	
-	
-  /* data mode */
-	
-  if (!(type == 0x10))	 /* write mode */
-		{
-			s_upk.buf[12]=s_upk.buf[12]&0x7f;
-			HAL_SPI_Transmit(&hspi5, s_upk.buf + 12, size, 1000);
-		}
-	
-  else	/* read mode */
-  {
-		
-		s_upk.buf[12]=s_upk.buf[12]|0x80;
-		response_size = (*(s_upk.buf + 9) << 8) + *(s_upk.buf + 10)+2;
-		
-		HAL_SPI_TransmitReceive(&hspi5, s_upk.buf + 12, s_upk.buf + (12+size-1), response_size, 1000);
-		size= response_size+size-1;
+        type = s_upk.buf[7] & 0x10;
+        //u16 size;
+        size = (*(s_upk.buf + 9) << 8) + *(s_upk.buf + 10) + 1;
+        u16 response_size;
 
-  }
-	
-		idelay_spi(20);
-		IO9(1);
-		uart_transfer_task(6 + size); 	
+        IO9(0);
+        idelay_spi(20);
 
-	}
+        /* data mode */
+
+        if (!(type == 0x10)) /* write mode */
+        {
+            s_upk.buf[12] = s_upk.buf[12] & 0x7f;
+            HAL_SPI_Transmit(&hspi5, s_upk.buf + 12, size, 1000);
+        }
+
+        else /* read mode */
+        {
+
+            s_upk.buf[12] = s_upk.buf[12] | 0x80;
+            response_size = (*(s_upk.buf + 9) << 8) + *(s_upk.buf + 10) + 2;
+
+            HAL_SPI_TransmitReceive(&hspi5, s_upk.buf + 12, s_upk.buf + (12 + size - 1), response_size, 1000);
+            size = response_size + size - 1;
+        }
+
+        idelay_spi(20);
+        IO9(1);
+        uart_transfer_task(6 + size);
+    }
 }
 
 /***************************************************************************
@@ -994,8 +976,27 @@ int init_rtp_task(void)
         }
 
         s_rtp.play++;
+        s_rtp.dual = 0;
         s_rtp.cnt[p] = 0;
+        s_rtp.pid[0] = g_i2c_id;
         s_rtp.dev = s_upk.buf[7];
+
+        if (s_rtp.dev & 0xF0)
+        {
+            if (s_rtp.dev == 0x12)
+            {
+                s_rtp.pid[0] = 0x90;
+                s_rtp.pid[1] = 0xB2;
+            }
+            else
+            {
+                s_rtp.pid[0] = 0xB2;
+                s_rtp.pid[1] = 0x90;
+            }
+            s_rtp.dual = 1;
+            s_rtp.dev &= 0x0F;
+        }
+
         s_rtp.size[p] = _8u16(s_upk.buf + 9);
 
         for (int i = 0; i < s_rtp.size[p]; i++)
@@ -1068,7 +1069,7 @@ Descript 	: stream data for real time play
 int play_rtp_task(void)
 {
     u8 buf[2];
-    u16 fifo, play;
+    u16 fifo, play, div;
     static u8 echo, p;
 
     if (s_rtp.play && (s_bit.rtp_stop == 0))
@@ -1161,21 +1162,34 @@ int play_rtp_task(void)
         {
             /* step : check fifo */
             fifo = i2c_8bit_r(0x0A);
+            /* dual play size check */
+            div = s_rtp.size[p] >> s_rtp.dual;
 
             /* what if fifo is empty?*/
-            if (s_rtp.size[p] > s_rtp.cnt[p])
+            if (div > s_rtp.cnt[p])
             {
                 play = 2048 - (fifo * 64 + 64);
 
-                if (play > (s_rtp.size[p] - s_rtp.cnt[p]))
+                if (play > (div - s_rtp.cnt[p]))
                 {
-                    play = s_rtp.size[p] - s_rtp.cnt[p];
+                    play = div - s_rtp.cnt[p];
                 }
 
-                i2c_write_task(g_i2c_id, 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_1MHZ);
-                // i2c_8bit_w(0x09, 0x01);
+                i2c_write_task(s_rtp.pid[0], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_2MHZ);
+
+                if (s_rtp.dual == 1)
+                {
+                    i2c_write_task(s_rtp.pid[1], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + (div + s_rtp.cnt[p])), play, I2C_2MHZ);
+                }
+
                 buf[0] = 0x01;
-                i2c_write_task(g_i2c_id, 0x09, I2C_8BIT, buf, 1, I2C_1MHZ);
+                i2c_write_task(s_rtp.pid[0], 0x09, I2C_8BIT, buf, 1, I2C_2MHZ);
+
+                if (s_rtp.dual == 1)
+                {
+                    i2c_write_task(s_rtp.pid[1], 0x09, I2C_8BIT, buf, 1, I2C_2MHZ);
+                }
+
                 s_rtp.cnt[p] += play;
 
                 /* hand shake */
@@ -1187,7 +1201,7 @@ int play_rtp_task(void)
                 }
 
                 /* swap buffer */
-                if (s_rtp.size[p] == s_rtp.cnt[p])
+                if (div <= s_rtp.cnt[p])
                 {
                     p ^= 1;
                     echo = 0;
@@ -1782,7 +1796,7 @@ void rednoah3_main_task(void)
         case SCP_FSM:
             g_sensor_set_task();
             break;
-				case COMM_FSM:
+        case COMM_FSM:
             comm_set_task();
             break;
         }

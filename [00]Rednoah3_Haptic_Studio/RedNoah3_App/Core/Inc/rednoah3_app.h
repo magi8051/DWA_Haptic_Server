@@ -46,7 +46,7 @@ extern "C"
   typedef signed int s32;
 
   /*Boot Define*/
-#define REDNOAH_FW_INFO 0x23102700 /* INFO -> (0x/year/month/date/rev 0 to 255) */
+#define REDNOAH_FW_INFO 0x24012100 /* INFO -> (0x/year/month/date/rev 0 to 255) */
 #define REDNOAH_RESET SCB->AIRCR = 0x05FA0000 | 0x04
 #define REDNOAH_FLASH_20 ((u32)0x08180000)
 /* Packet Define */
@@ -66,13 +66,13 @@ extern "C"
 #define PI_ 3.14159265
 
 /*I2C Define*/
-#define I2C_50KHZ 244//136
-#define I2C_100KHZ	122 //68	
-#define I2C_400KHZ	27 //16
-#define I2C_1MHZ	8 //5
-#define I2C_1_2MHZ	6 //4
-#define I2C_2MHZ	4 //2
-#define I2C_3MHZ	2 //1
+#define I2C_50KHZ 244  // 136
+#define I2C_100KHZ 122 // 68
+#define I2C_400KHZ 27  // 16
+#define I2C_1MHZ 8     // 5
+#define I2C_1_2MHZ 6   // 4
+#define I2C_2MHZ 4     // 2
+#define I2C_3MHZ 2     // 1
 #define I2C_8BIT 1
 #define I2C_16BIT 2
 #define I2C_ACK 0
@@ -150,6 +150,8 @@ extern "C"
     u8 id;
     u8 pk;
     u8 mode;
+    u8 dual;
+    u8 pid[2];
     u16 play;
     u16 psize;
     u16 cnt[2];
@@ -176,7 +178,7 @@ extern "C"
   extern UART_HandleTypeDef huart3;
   extern DMA_HandleTypeDef hdma_usart1_tx;
   extern DMA_HandleTypeDef hdma_usart1_rx;
-	extern SPI_HandleTypeDef hspi5;
+  extern SPI_HandleTypeDef hspi5;
 
   /* Private defines -----------------------------------------------------------*/
   /* USER CODE BEGIN Private defines */
@@ -194,14 +196,14 @@ extern "C"
   void g_sensor_set_task(void);
   void rednoah3_main_task(void);
   static void i2c_task(void);
-	static void comm_set_task(void);
+  static void comm_set_task(void);
   static void sys_led_task(void);
   static void sys_timer_set(u32 timer, u32 mode, u32 usec);
   static void board_set_task(void);
   static void device_info_request(void);
   static void delay_us(int t);
   static void triger_ctrl_task(void);
-	static void idelay_spi(volatile uint32_t tmout);
+  static void idelay_spi(volatile uint32_t tmout);
 
 #ifdef __cplusplus
 }
