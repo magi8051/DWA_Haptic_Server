@@ -962,9 +962,10 @@ int init_rtp_task(void)
 {
     static u8 p;
     u16 time;
+	   u16 fifo, play, div;
 
     /* basic setup */
-    if (s_upk.buf[8] == PLAY)
+    if (s_upk.buf[8] == PLAY)			
     {
         /* first time register clear*/
         if (s_bit.rtp_act == 0)
@@ -994,7 +995,6 @@ int init_rtp_task(void)
                 s_rtp.pid[1] = 0x90;
             }
             s_rtp.dual = 1;
-            s_rtp.dev &= 0x0F;
         }
 
         s_rtp.size[p] = _8u16(s_upk.buf + 9);
@@ -1017,11 +1017,26 @@ int init_rtp_task(void)
             {
                 time = 5000;
             }
-            else if (s_rtp.dev == DW7912)
+            else if ((s_rtp.dev & 0X0F) == DW7912)
             {
                 /* for test set value */
-                time = 5000;
-                // i2c_8bit_w(0x09, 0x01);
+                time = 5000;	
+            /* step : check fifo */
+            fifo = i2c_8bit_r(0x0A);
+            /* dual play size check */
+            div = s_rtp.size[p] >> s_rtp.dual;
+            /* what if fifo is empty?*/
+           
+								play = 2048 - (fifo * 64 + 64);
+
+                i2c_write_task(s_rtp.pid[0], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_3MHZ);
+
+                if (s_rtp.dual == 1)
+                {
+                    i2c_write_task(s_rtp.pid[1], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + (div + s_rtp.cnt[p])), play, I2C_3MHZ);
+                }
+								s_rtp.cnt[p] += play;
+							
             }
             else if (s_rtp.dev == DW7914)
             {
@@ -1045,7 +1060,7 @@ int init_rtp_task(void)
         {
             i2c_8bit_w(0x0C, 0x00);
         }
-        else if (s_rtp.dev == DW7912)
+        else if ((s_rtp.dev & 0X0F) == DW7912)
         {
             /* play stop & fifo fulsh */
             i2c_8bit_w(0x09, 0x00);
@@ -1158,36 +1173,34 @@ int play_rtp_task(void)
         }
 
         /* DW7912 */
-        else if (s_rtp.dev == DW7912)
+        else if ((s_rtp.dev & 0X0F) == DW7912)
         {
             /* step : check fifo */
             fifo = i2c_8bit_r(0x0A);
             /* dual play size check */
             div = s_rtp.size[p] >> s_rtp.dual;
-
             /* what if fifo is empty?*/
             if (div > s_rtp.cnt[p])
             {
-                play = 2048 - (fifo * 64 + 64);
-
+								play = 2048 - (fifo * 64 + 64);
                 if (play > (div - s_rtp.cnt[p]))
                 {
                     play = div - s_rtp.cnt[p];
                 }
 
-                i2c_write_task(s_rtp.pid[0], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_2MHZ);
+                i2c_write_task(s_rtp.pid[0], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + s_rtp.cnt[p]), play, I2C_3MHZ);
 
                 if (s_rtp.dual == 1)
                 {
-                    i2c_write_task(s_rtp.pid[1], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + (div + s_rtp.cnt[p])), play, I2C_2MHZ);
+                    i2c_write_task(s_rtp.pid[1], 0x0A, I2C_8BIT, ((u8 *)s_rtp.buf[p] + (div + s_rtp.cnt[p])), play, I2C_3MHZ);
                 }
 
                 buf[0] = 0x01;
-                i2c_write_task(s_rtp.pid[0], 0x09, I2C_8BIT, buf, 1, I2C_2MHZ);
+                i2c_write_task(s_rtp.pid[0], 0x09, I2C_8BIT, buf, 1, I2C_3MHZ);
 
                 if (s_rtp.dual == 1)
                 {
-                    i2c_write_task(s_rtp.pid[1], 0x09, I2C_8BIT, buf, 1, I2C_2MHZ);
+                    i2c_write_task(s_rtp.pid[1], 0x09, I2C_8BIT, buf, 1, I2C_3MHZ);
                 }
 
                 s_rtp.cnt[p] += play;
@@ -1265,7 +1278,9 @@ int play_rtp_task(void)
         s_upk.buf[6] = 0x02;
         s_upk.buf[7] = s_rtp.dev;
         s_upk.buf[8] = 0xff;
-        uart_transfer_task(3);
+				s_upk.buf[9] = s_rtp.play;
+				s_upk.buf[10] = s_bit.rtp_stop;
+        uart_transfer_task(5);
 
         LED1(LEDON);
         LED2(LEDON);
@@ -1860,7 +1875,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
                 s_upk.buf[6] = 0x00;
                 s_upk.buf[7] = 0xEC;
                 s_upk.buf[8] = 0xE1;
-                uart_transfer_task(3);
+                uart_transfer_task(5);
             }
             else
             {
